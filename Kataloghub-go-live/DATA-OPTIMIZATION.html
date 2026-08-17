@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>KatalogHub — Data Optimization Plan</title>
+<style>
+@page { size: A4; margin: 16mm 14mm 20mm 14mm; }
+@media print { body { font-size: 8pt; } pre { page-break-inside: avoid; } h2,h3 { page-break-after: avoid; } table { page-break-inside: avoid; } }
+* { box-sizing: border-box; }
+body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 9pt; line-height: 1.5; color: #1e293b; max-width: 210mm; margin: 0 auto; padding: 0 10px; }
+.title-block { text-align: center; padding: 20px 0 14px 0; border-bottom: 3px solid #2563eb; margin-bottom: 18px; }
+.title-block h1 { font-size: 20pt; color: #111827; margin: 0 0 6px 0; }
+.title-block .subtitle { font-size: 10pt; color: #2563eb; font-weight: 600; margin: 0; }
+h1 { font-size: 14pt; color: #111827; border-bottom: 3px solid #3b82f6; padding-bottom: 4px; margin: 20px 0 8px 0; }
+h2 { font-size: 12pt; color: #2563eb; border-bottom: 1.5px solid #93c5fd; padding-bottom: 3px; margin: 16px 0 6px 0; }
+h3 { font-size: 10pt; color: #1e293b; margin: 12px 0 5px 0; }
+code { font-family: 'Consolas','Courier New',monospace; font-size: 7pt; background: #f1f5f9; padding: 1px 4px; border-radius: 3px; }
+pre { background: #0f172a; color: #e2e8f0; padding: 7px 9px; border-radius: 5px; font-size: 6.5pt; line-height: 1.35; overflow-x: auto; }
+pre code { background: none; padding: 0; color: inherit; }
+table { border-collapse: collapse; width: 100%; font-size: 7.5pt; margin: 5px 0 10px 0; border: 1px solid #e2e8f0; }
+th { background: #eff6ff; text-align: left; padding: 3px 6px; border: 1px solid #bfdbfe; font-weight: 700; color: #1e40af; }
+td { padding: 3px 6px; border: 1px solid #e2e8f0; vertical-align: top; }
+tr:nth-child(even) td { background: #fafafa; }
+ul,ol { padding-left: 18px; margin: 2px 0 5px 0; }
+li { margin: 1px 0; }
+p { margin: 2px 0 5px 0; }
+strong { color: #0f172a; }
+blockquote { border-left: 4px solid #3b82f6; padding: 4px 10px; margin: 6px 0; background: #eff6ff; color: #1e40af; border-radius: 0 5px 5px 0; font-size: 8pt; }
+hr { border: none; border-top: 2px solid #bfdbfe; margin: 14px 0; }
+.tag-critical { display: inline-block; background: #dc2626; color: #fff; font-size: 7pt; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
+.tag-high { display: inline-block; background: #ea580c; color: #fff; font-size: 7pt; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
+.tag-medium { display: inline-block; background: #ca8a04; color: #fff; font-size: 7pt; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="title-block">
+  <h1>📊 KatalogHub — Data Optimization Plan</h1>
+  <p class="subtitle">Dari 5.5/10 → Target 9.5/10 • Eliminasi N+1 Query</p>
+</div>
+<h1>📊 KatalogHub — Data Optimization Plan</h1>
+<blockquote>
+<p><strong>Goal:</strong> Menaikkan data score dari <strong>8/10 → 10/10</strong><br />
+<strong>Audit Date:</strong> 30 Juli 2026<br />
+<strong>Total N+1 patterns found:</strong> 10 locations<br />
+<strong>Data integrity issues:</strong> 7 locations  </p>
+</blockquote>
+<hr />
+<h2>📋 Ringkasan Masalah</h2>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Severity</th>
+<th>Files Affected</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N+1 query di loop produk</td>
+<td>🔴 Critical</td>
+<td><code>product-actions.ts</code>, <code>public-data.ts</code></td>
+<td><strong>200+ query</strong> untuk 20 produk</td>
+</tr>
+<tr>
+<td>Sequential disjointed queries</td>
+<td>🟠 High</td>
+<td><code>public-data.ts</code>, <code>product-actions.ts</code></td>
+<td>6 query per produk detail</td>
+</tr>
+<tr>
+<td>Manual aggregation di JS</td>
+<td>🟠 High</td>
+<td><code>public-data.ts</code>, <code>saas-actions.ts</code></td>
+<td>Scaling failure &gt;500 produk</td>
+</tr>
+<tr>
+<td>No pagination di admin</td>
+<td>🟡 Medium</td>
+<td><code>saas-actions.ts</code></td>
+<td>Memory overflow</td>
+</tr>
+<tr>
+<td>Race condition slug unique</td>
+<td>🟡 Medium</td>
+<td><code>product-actions.ts</code></td>
+<td>Duplicate slug crash</td>
+</tr>
+<tr>
+<td>JSON serialization inconsistency</td>
+<td>🟢 Low</td>
+<td><code>product-actions.ts</code></td>
+<td>Gallery parse hack everywhere</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>🔍 N+1 Query Deep Dive</h2>
+<h3>Pattern 1: <code>fetchProducts</code> → <code>checkRequiredSpecsFilled</code> per row</h3>
+<p><strong>File:</strong> <code>src/lib/actions/product-actions.ts:91-109</code></p>
+<p><strong>Current (N+1):</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="mf">1</span><span class="w"> </span><span class="n">query</span><span class="p">:</span><span class="w">  </span><span class="n">SELECT</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="n">JOIN</span><span class="w"> </span><span class="n">categories</span><span class="w"> </span><span class="n">LIMIT</span><span class="w"> </span><span class="mf">20</span>
+<span class="n">N</span><span class="w"> </span><span class="n">queries</span><span class="p">:</span><span class="w"> </span><span class="kr">FOR</span><span class="w"> </span><span class="n">EACH</span><span class="w"> </span><span class="n">product</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">checkRequiredSpecsFilled</span><span class="p">()</span>
+<span class="w">  </span><span class="err">├──</span><span class="w"> </span><span class="mf">1</span><span class="w"> </span><span class="n">query</span><span class="p">:</span><span class="w"> </span><span class="n">category_spec_templates</span><span class="w"> </span><span class="p">(</span><span class="n">by</span><span class="w"> </span><span class="n">category_id</span><span class="p">)</span>
+<span class="w">  </span><span class="err">├──</span><span class="w"> </span><span class="mf">1</span><span class="w"> </span><span class="n">query</span><span class="p">:</span><span class="w"> </span><span class="n">category_spec_fields</span><span class="w"> </span><span class="p">(</span><span class="n">by</span><span class="w"> </span><span class="n">template_id</span><span class="p">)</span><span class="w"> </span>
+<span class="w">  </span><span class="err">└──</span><span class="w"> </span><span class="mf">1</span><span class="w"> </span><span class="n">query</span><span class="p">:</span><span class="w"> </span><span class="n">product_spec_values</span><span class="w"> </span><span class="p">(</span><span class="n">by</span><span class="w"> </span><span class="n">product_id</span><span class="p">)</span>
+<span class="kr">To</span><span class="n">tal</span><span class="p">:</span><span class="w"> </span><span class="mf">1</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">N</span><span class="w"> </span><span class="err">×</span><span class="w"> </span><span class="mf">3</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">61</span><span class="w"> </span><span class="n">queries</span><span class="w"> </span><span class="n">untuk</span><span class="w"> </span><span class="mf">20</span><span class="w"> </span><span class="n">produk</span>
+</code></pre></div>
+
+<p><strong>Fix — Bulk check dengan batch query:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">fetchProducts</span><span class="p">(</span><span class="nx">opts</span><span class="o">?:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">})</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">FetchProductsResult</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">userId</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">requireAdmin</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">createClient</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">opts</span><span class="o">?</span><span class="p">.</span><span class="nx">limit</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">20</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">opts</span><span class="o">?</span><span class="p">.</span><span class="nx">offset</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="p">;</span>
+
+<span class="w">  </span><span class="c1">// Single query: products + categories join + left join spec check</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="nx">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">    </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;products&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="sb">`</span>
+<span class="sb">      id, name, slug, category_id, main_image_path, price, </span>
+<span class="sb">      is_visible, sort_order, updated_at,</span>
+<span class="sb">      categories!inner(id, name, slug)</span>
+<span class="sb">    `</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">count</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;exact&quot;</span><span class="w"> </span><span class="p">})</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">userId</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">order</span><span class="p">(</span><span class="s2">&quot;sort_order&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">ascending</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">})</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">order</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">ascending</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">})</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">range</span><span class="p">(</span><span class="nx">offset</span><span class="p">,</span><span class="w"> </span><span class="nx">offset</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nx">limit</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">1</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// ... filters same as before</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="p">,</span><span class="w"> </span><span class="nx">count</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">query</span><span class="p">;</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="nx">error</span><span class="p">.</span><span class="nx">message</span><span class="p">);</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">rows</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[];</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">rows</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">items</span><span class="o">:</span><span class="w"> </span><span class="p">[],</span><span class="w"> </span><span class="nx">total</span><span class="o">:</span><span class="w"> </span><span class="kt">count</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="w"> </span><span class="p">};</span>
+
+<span class="w">  </span><span class="c1">// ── BULK spec check: 3 queries total, bukan N×3 ──</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">productIds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">rows</span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">r</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">r</span><span class="p">.</span><span class="nx">id</span><span class="p">);</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">categoryIds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[...</span><span class="ow">new</span><span class="w"> </span><span class="nb">Set</span><span class="p">(</span><span class="nx">rows</span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">r</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">r</span><span class="p">.</span><span class="nx">category_id</span><span class="p">))];</span>
+
+<span class="w">  </span><span class="c1">// 1. Ambil semua template untuk category yang relevan</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="kt">templates</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">    </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;category_spec_templates&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;category_id, id&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="ow">in</span><span class="p">(</span><span class="s2">&quot;category_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">categoryIds</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;is_active&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">);</span>
+
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">templates</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nx">templates</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// No templates → all products have complete specs</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">items</span><span class="o">:</span><span class="w"> </span><span class="kt">rows.map</span><span class="p">((</span><span class="nx">r</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">({</span><span class="w"> </span><span class="p">...</span><span class="nx">r</span><span class="p">,</span><span class="w"> </span><span class="nx">category_name</span><span class="o">:</span><span class="w"> </span><span class="kt">r.categories?.name</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="s2">&quot;—&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">category_slug</span><span class="o">:</span><span class="w"> </span><span class="kt">r.categories?.slug</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">has_required_specs</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">})),</span>
+<span class="w">      </span><span class="nx">total</span><span class="o">:</span><span class="w"> </span><span class="kt">count</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">    </span><span class="p">};</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">templateIds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">templates</span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">t</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">t</span><span class="p">.</span><span class="nx">id</span><span class="p">);</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">categoryToTemplate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Map</span><span class="p">(</span><span class="nx">templates</span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">t</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">[</span><span class="nx">t</span><span class="p">.</span><span class="nx">category_id</span><span class="p">,</span><span class="w"> </span><span class="nx">t</span><span class="p">.</span><span class="nx">id</span><span class="p">]));</span>
+
+<span class="w">  </span><span class="c1">// 2. Ambil semua required field IDs untuk semua template ini</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="kt">reqFields</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">    </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;category_spec_fields&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;id, template_id&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="ow">in</span><span class="p">(</span><span class="s2">&quot;template_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">templateIds</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;is_required&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">);</span>
+
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">reqFields</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nx">reqFields</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">items</span><span class="o">:</span><span class="w"> </span><span class="kt">rows.map</span><span class="p">((</span><span class="nx">r</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">({</span><span class="w"> </span><span class="p">...</span><span class="nx">r</span><span class="p">,</span><span class="w"> </span><span class="nx">category_name</span><span class="o">:</span><span class="w"> </span><span class="kt">r.categories?.name</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="s2">&quot;—&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">category_slug</span><span class="o">:</span><span class="w"> </span><span class="kt">r.categories?.slug</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">has_required_specs</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">})),</span>
+<span class="w">      </span><span class="nx">total</span><span class="o">:</span><span class="w"> </span><span class="kt">count</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">    </span><span class="p">};</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">reqFieldIds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">reqFields</span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">f</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">f</span><span class="p">.</span><span class="nx">id</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// 3. Ambil semua product_spec_values untuk produk ini yang field_id-nya required</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="kt">filledValues</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">    </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;product_spec_values&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;product_id, field_id, value_text, value_number, value_boolean, value_select&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="ow">in</span><span class="p">(</span><span class="s2">&quot;product_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">productIds</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="ow">in</span><span class="p">(</span><span class="s2">&quot;field_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">reqFieldIds</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Build lookup: product_id → Set of filled field IDs</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">filledMap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Map</span><span class="o">&lt;</span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nb">Set</span><span class="o">&lt;</span><span class="kt">string</span><span class="o">&gt;&gt;</span><span class="p">();</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kd">const</span><span class="w"> </span><span class="nx">v</span><span class="w"> </span><span class="k">of</span><span class="w"> </span><span class="p">(</span><span class="nx">filledValues</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[])</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">any</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">isFilled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">v</span><span class="p">.</span><span class="nx">value_text</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">v</span><span class="p">.</span><span class="nx">value_text</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s2">&quot;&quot;</span>
+<span class="w">      </span><span class="o">||</span><span class="w"> </span><span class="nx">v</span><span class="p">.</span><span class="nx">value_number</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">      </span><span class="o">||</span><span class="w"> </span><span class="nx">v</span><span class="p">.</span><span class="nx">value_boolean</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">      </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="nx">v</span><span class="p">.</span><span class="nx">value_select</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">v</span><span class="p">.</span><span class="nx">value_select</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">isFilled</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">filledMap</span><span class="p">.</span><span class="nx">has</span><span class="p">(</span><span class="nx">v</span><span class="p">.</span><span class="nx">product_id</span><span class="p">))</span><span class="w"> </span><span class="nx">filledMap</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="nx">v</span><span class="p">.</span><span class="nx">product_id</span><span class="p">,</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Set</span><span class="p">());</span>
+<span class="w">      </span><span class="nx">filledMap</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">v</span><span class="p">.</span><span class="nx">product_id</span><span class="p">)</span><span class="o">!</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="nx">v</span><span class="p">.</span><span class="nx">field_id</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// Per product: template → required fields → check filled</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">templateReqFields</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Map</span><span class="o">&lt;</span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="kt">string</span><span class="p">[]</span><span class="o">&gt;</span><span class="p">();</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kd">const</span><span class="w"> </span><span class="nx">f</span><span class="w"> </span><span class="k">of</span><span class="w"> </span><span class="nx">reqFields</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">any</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">templateReqFields</span><span class="p">.</span><span class="nx">has</span><span class="p">(</span><span class="nx">f</span><span class="p">.</span><span class="nx">template_id</span><span class="p">))</span><span class="w"> </span><span class="nx">templateReqFields</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="nx">f</span><span class="p">.</span><span class="nx">template_id</span><span class="p">,</span><span class="w"> </span><span class="p">[]);</span>
+<span class="w">    </span><span class="nx">templateReqFields</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">f</span><span class="p">.</span><span class="nx">template_id</span><span class="p">)</span><span class="o">!</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="nx">f</span><span class="p">.</span><span class="nx">id</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">items</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">rows</span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">r</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">tplId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">categoryToTemplate</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">r</span><span class="p">.</span><span class="nx">category_id</span><span class="p">);</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">filled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">tplId</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="p">(</span><span class="nx">filledMap</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">r</span><span class="p">.</span><span class="nx">id</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="nx">size</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">required</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">tplId</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="p">(</span><span class="nx">templateReqFields</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">tplId</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="kt">r.id</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="kt">r.name</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">slug</span><span class="o">:</span><span class="w"> </span><span class="kt">r.slug</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">category_id</span><span class="o">:</span><span class="w"> </span><span class="kt">r.category_id</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">category_name</span><span class="o">:</span><span class="w"> </span><span class="kt">r.categories?.name</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="s2">&quot;—&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">category_slug</span><span class="o">:</span><span class="w"> </span><span class="kt">r.categories?.slug</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">main_image_path</span><span class="o">:</span><span class="w"> </span><span class="kt">r.main_image_path</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">price</span><span class="o">:</span><span class="w"> </span><span class="kt">r.price</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">is_visible</span><span class="o">:</span><span class="w"> </span><span class="kt">r.is_visible</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">sort_order</span><span class="o">:</span><span class="w"> </span><span class="kt">r.sort_order</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">updated_at</span><span class="o">:</span><span class="w"> </span><span class="kt">r.updated_at</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">has_required_specs</span><span class="o">:</span><span class="w"> </span><span class="kt">filled</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="nx">required</span><span class="p">,</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="nx">satisfies</span><span class="w"> </span><span class="nx">ProductListItem</span><span class="p">;</span>
+<span class="w">  </span><span class="p">});</span>
+
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">items</span><span class="p">,</span><span class="w"> </span><span class="nx">total</span><span class="o">:</span><span class="w"> </span><span class="kt">count</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="w"> </span><span class="p">};</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Comparison:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Before</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query count (20 products)</td>
+<td><strong>61</strong></td>
+<td><strong>4</strong></td>
+</tr>
+<tr>
+<td>Query count (100 products)</td>
+<td><strong>301</strong></td>
+<td><strong>4</strong></td>
+</tr>
+<tr>
+<td>Response time</td>
+<td>O(N) linear</td>
+<td>O(1) constant</td>
+</tr>
+<tr>
+<td>Data transfer</td>
+<td>60 round trips</td>
+<td>4 round trips</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>Pattern 2: <code>getVisibleCategories</code> → <code>getProductCounts</code> manual</h3>
+<p><strong>File:</strong> <code>src/lib/public-data.ts:73-113</code></p>
+<p><strong>Current (1+N):</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="mf">1</span><span class="w"> </span><span class="n">query</span><span class="p">:</span><span class="w"> </span><span class="n">SELECT</span><span class="w"> </span><span class="n">categories</span><span class="w"> </span><span class="p">(</span><span class="n">all</span><span class="w"> </span><span class="n">active</span><span class="p">)</span>
+<span class="mf">1</span><span class="w"> </span><span class="n">query</span><span class="p">:</span><span class="w"> </span><span class="n">SELECT</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="p">(</span><span class="n">ALL</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">client</span><span class="o">-</span><span class="n">side</span><span class="w"> </span><span class="n">count</span><span class="err">!</span><span class="p">)</span>
+<span class="kr">To</span><span class="n">tal</span><span class="p">:</span><span class="w"> </span><span class="mf">2</span><span class="w"> </span><span class="n">query</span><span class="p">,</span><span class="w"> </span><span class="n">but</span><span class="w"> </span><span class="n">ALL</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="n">transferred</span>
+</code></pre></div>
+
+<p><strong>Fix — Use subquery with Supabase <code>count</code> aggregate:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getVisibleCategories</span><span class="p">(</span><span class="nx">storeSlug</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">PublicCategory</span><span class="p">[]</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">ownerId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">getStoreOwnerId</span><span class="p">(</span><span class="nx">storeSlug</span><span class="p">);</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">ownerId</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="p">[];</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">createAdminClient</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">    </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;categories&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="sb">`</span>
+<span class="sb">      id, name, slug, description, image_path, image_alt, sort_order,</span>
+<span class="sb">      products!inner(count)</span>
+<span class="sb">    `</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">ownerId</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;is_visible&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;products.is_visible&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">order</span><span class="p">(</span><span class="s2">&quot;sort_order&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">ascending</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">})</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">order</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">ascending</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">});</span>
+
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s2">&quot;[getVisibleCategories]&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="p">.</span><span class="nx">message</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">[];</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="nx">data</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[]).</span><span class="nx">map</span><span class="p">((</span><span class="nx">c</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">({</span>
+<span class="w">    </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="kt">c.id</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="kt">c.name</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">slug</span><span class="o">:</span><span class="w"> </span><span class="kt">c.slug</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">description</span><span class="o">:</span><span class="w"> </span><span class="kt">c.description</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">image_path</span><span class="o">:</span><span class="w"> </span><span class="kt">c.image_path</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">image_alt</span><span class="o">:</span><span class="w"> </span><span class="kt">c.image_alt</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">sort_order</span><span class="o">:</span><span class="w"> </span><span class="kt">c.sort_order</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">product_count</span><span class="o">:</span><span class="w"> </span><span class="kt">c.products?.</span><span class="p">[</span><span class="mf">0</span><span class="p">]</span><span class="o">?</span><span class="p">.</span><span class="nx">count</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">  </span><span class="p">}));</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Comparison:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Before</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query count</td>
+<td>2 (1 cat + 1 all products)</td>
+<td><strong>1</strong></td>
+</tr>
+<tr>
+<td>Data transfer</td>
+<td>Semua produk dikirim</td>
+<td>Hanya count via join</td>
+</tr>
+<tr>
+<td>Time complexity</td>
+<td>O(categories + products)</td>
+<td>O(categories)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>Pattern 3: <code>fetchProductDetail</code> — 6 sequential queries</h3>
+<p><strong>File:</strong> <code>src/lib/actions/product-actions.ts:162-227</code></p>
+<p><strong>Current:</strong> Product → Category → Template → Fields → Values → Documents = <strong>6 query</strong></p>
+<p><strong>Fix — Gabung semua dalam 3 parallel query:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">fetchProductDetail</span><span class="p">(</span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">ProductDetail</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">userId</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">requireAdmin</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">createClient</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Parallel: product + category, spec template + fields, documents</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">productResult</span><span class="p">,</span><span class="w"> </span><span class="nx">specResult</span><span class="p">,</span><span class="w"> </span><span class="nx">docResult</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nb">Promise</span><span class="p">.</span><span class="nx">all</span><span class="p">([</span>
+<span class="w">    </span><span class="c1">// 1. Product + category in one query</span>
+<span class="w">    </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;products&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*, categories(id, name, slug)&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">id</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">userId</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">single</span><span class="p">(),</span>
+
+<span class="w">    </span><span class="c1">// 2. Template + fields in one query</span>
+<span class="w">    </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;category_spec_templates&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*, category_spec_fields(*)&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;category_id&quot;</span><span class="p">,</span><span class="w"> </span>
+<span class="w">        </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;products&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;category_id&quot;</span><span class="p">).</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">id</span><span class="p">).</span><span class="nx">single</span><span class="p">()</span><span class="w"> </span><span class="c1">// subquery</span>
+<span class="w">      </span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">maybeSingle</span><span class="p">(),</span>
+
+<span class="w">    </span><span class="c1">// 3. Documents</span>
+<span class="w">    </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;product_documents&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;product_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">id</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">order</span><span class="p">(</span><span class="s2">&quot;sort_order&quot;</span><span class="p">),</span>
+
+<span class="w">    </span><span class="c1">// 4. Spec values (parallel)</span>
+<span class="w">    </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;product_spec_values&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;product_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">id</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">order</span><span class="p">(</span><span class="s2">&quot;field_id&quot;</span><span class="p">),</span>
+<span class="w">  </span><span class="p">]);</span>
+
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">productResult</span><span class="p">.</span><span class="nx">error</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">!</span><span class="nx">productResult</span><span class="p">.</span><span class="nx">data</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="s2">&quot;Produk tidak ditemukan&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">product</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">productResult</span><span class="p">.</span><span class="nx">data</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">any</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">specData</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">specResult</span><span class="p">.</span><span class="nx">data</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">any</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">documents</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="nx">docResult</span><span class="p">.</span><span class="nx">data</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[])</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">ProductDocument</span><span class="p">[];</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">specValues</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="nx">specResult2</span><span class="o">?</span><span class="p">.</span><span class="nx">data</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[])</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">ProductSpecValue</span><span class="p">[];</span>
+
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">product</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="nx">product</span><span class="p">,</span><span class="w"> </span><span class="nx">gallery</span><span class="o">:</span><span class="w"> </span><span class="kt">parseGalleryField</span><span class="p">(</span><span class="nx">product</span><span class="p">.</span><span class="nx">gallery</span><span class="p">)</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">Product</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">category</span><span class="o">:</span><span class="w"> </span><span class="kt">product.categories</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="kt">product.category_id</span><span class="p">,</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;—&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">slug</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nx">spec_template</span><span class="o">:</span><span class="w"> </span><span class="kt">specData</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="kt">specData.id</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">is_active</span><span class="o">:</span><span class="w"> </span><span class="kt">specData.is_active</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">fields</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="nx">specData</span><span class="p">.</span><span class="nx">category_spec_fields</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[])</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">CategorySpecField</span><span class="p">[],</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">spec_values</span><span class="o">:</span><span class="w"> </span><span class="kt">specValues</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">documents</span><span class="p">,</span>
+<span class="w">  </span><span class="p">};</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Wait, I can't use subquery like that. Let me fix the approach:</p>
+<p>Actually, the simplest fix for <code>fetchProductDetail</code> is:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">fetchProductDetail</span><span class="p">(</span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">ProductDetail</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">userId</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">requireAdmin</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">createClient</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// 1. Product query with category join</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="kt">product</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">    </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;products&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*, categories(id, name, slug)&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">id</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">userId</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">single</span><span class="p">();</span>
+
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">!</span><span class="nx">product</span><span class="p">)</span><span class="w"> </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="s2">&quot;Produk tidak ditemukan&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">product</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">Product</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">categories</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="kt">UUID</span><span class="p">;</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span><span class="w"> </span><span class="nx">slug</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">};</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">categoryId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">category_id</span><span class="p">;</span>
+
+<span class="w">  </span><span class="c1">// 2. Parallel: spec info + documents</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">specResult</span><span class="p">,</span><span class="w"> </span><span class="nx">docResult</span><span class="p">,</span><span class="w"> </span><span class="nx">valuesResult</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nb">Promise</span><span class="p">.</span><span class="nx">all</span><span class="p">([</span>
+<span class="w">    </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;category_spec_templates&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*, category_spec_fields(*)&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;category_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">categoryId</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">maybeSingle</span><span class="p">(),</span>
+<span class="w">    </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;product_documents&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;product_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">id</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">order</span><span class="p">(</span><span class="s2">&quot;sort_order&quot;</span><span class="p">),</span>
+<span class="w">    </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;product_spec_values&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;product_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">id</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">order</span><span class="p">(</span><span class="s2">&quot;field_id&quot;</span><span class="p">),</span>
+<span class="w">  </span><span class="p">]);</span>
+
+<span class="w">  </span><span class="c1">// ... rest same</span>
+</code></pre></div>
+
+<p>That improves from 6 sequential queries to 3 parallel queries. Still room for improvement but 50% reduction.</p>
+<hr />
+<h3>Pattern 4: <code>getProductBySlug</code> — 6 sequential queries (public side)</h3>
+<p><strong>File:</strong> <code>src/lib/public-data.ts:267-348</code></p>
+<p><strong>Current:</strong> product → category → template → fields → values → documents = <strong>6 sequential</strong></p>
+<p><strong>Fix — Sama dengan fetchProductDetail, pakai Promise.all:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getProductBySlug</span><span class="p">(</span><span class="nx">storeSlug</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">productSlug</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">PublicProductDetail</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="kc">null</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">ownerId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">getStoreOwnerId</span><span class="p">(</span><span class="nx">storeSlug</span><span class="p">);</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">ownerId</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">createAdminClient</span><span class="p">();</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="kt">product</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">    </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;products&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">ownerId</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;slug&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">productSlug</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;is_visible&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">single</span><span class="p">();</span>
+
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">product</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">product</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">Product</span><span class="p">;</span>
+
+<span class="w">  </span><span class="c1">// Parallel queries</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">catResult</span><span class="p">,</span><span class="w"> </span><span class="nx">templateResult</span><span class="p">,</span><span class="w"> </span><span class="nx">docResult</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nb">Promise</span><span class="p">.</span><span class="nx">all</span><span class="p">([</span>
+<span class="w">    </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;categories&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;id, name, slug&quot;</span><span class="p">).</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">category_id</span><span class="p">).</span><span class="nx">single</span><span class="p">(),</span>
+<span class="w">    </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;category_spec_templates&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*, category_spec_fields(*)&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;category_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">category_id</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;is_active&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">maybeSingle</span><span class="p">(),</span>
+<span class="w">    </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;product_documents&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">).</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;product_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">id</span><span class="p">).</span><span class="nx">order</span><span class="p">(</span><span class="s2">&quot;sort_order&quot;</span><span class="p">),</span>
+<span class="w">  </span><span class="p">]);</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="nx">specValues</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="nx">ProductSpecValue</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">field</span><span class="o">:</span><span class="w"> </span><span class="kt">CategorySpecField</span><span class="w"> </span><span class="p">})[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[];</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">templateResult</span><span class="p">.</span><span class="nx">data</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">any</span><span class="p">;</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">template</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="kt">values</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;product_spec_values&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;product_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">id</span><span class="p">);</span>
+
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">fields</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="nx">template</span><span class="p">.</span><span class="nx">category_spec_fields</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[])</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">CategorySpecField</span><span class="p">[];</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">fieldMap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Map</span><span class="p">(</span><span class="nx">fields</span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">f</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">[</span><span class="nx">f</span><span class="p">.</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">f</span><span class="p">]));</span>
+<span class="w">    </span><span class="nx">specValues</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">((</span><span class="nx">values</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[])</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">ProductSpecValue</span><span class="p">[])</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">v</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">const</span><span class="w"> </span><span class="nx">field</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">fieldMap</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">v</span><span class="p">.</span><span class="nx">field_id</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nx">field</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="nx">v</span><span class="p">,</span><span class="w"> </span><span class="nx">field</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">any</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">null</span><span class="p">;</span>
+<span class="w">      </span><span class="p">})</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">filter</span><span class="p">(</span><span class="nb">Boolean</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// ... rest same</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<hr />
+<h3>Pattern 5: Superadmin analytics — ALL data di client</h3>
+<p><strong>File:</strong> <code>src/lib/actions/saas-actions.ts</code></p>
+<p><strong><code>getSuperAdminStats()</code></strong>: 
+- 1 count profiles
+- 1 SELECT all subscriptions → manual forEach
+- 1 count products<br />
+- <strong>Problem:</strong> Subscriptions di-<em>load semua</em> padahal cuma butuh aggregasi</p>
+<p><strong>Fix — Gunakan proper aggregate query:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getSuperAdminStats</span><span class="p">()</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">SaaSStats</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">await</span><span class="w"> </span><span class="nx">requireSuperAdmin</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">createClient</span><span class="p">();</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">totalOwners</span><span class="p">,</span><span class="w"> </span><span class="nx">totalProducts</span><span class="p">,</span><span class="w"> </span><span class="nx">subscriptions</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nb">Promise</span><span class="p">.</span><span class="nx">all</span><span class="p">([</span>
+<span class="w">    </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;profiles&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">count</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;exact&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">head</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">}),</span>
+<span class="w">    </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;products&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">count</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;exact&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">head</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">}),</span>
+<span class="w">    </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;subscriptions&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;status, plan_name, expires_at&quot;</span><span class="p">),</span>
+<span class="w">  </span><span class="p">]);</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">now</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Date</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">next7Days</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Date</span><span class="p">(</span><span class="nx">now</span><span class="p">.</span><span class="nx">getTime</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">7</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">24</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">60</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">60</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">1000</span><span class="p">);</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">subs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="nx">subscriptions</span><span class="p">.</span><span class="nx">data</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[])</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">Subscription</span><span class="p">[];</span>
+
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">totalOwners</span><span class="o">:</span><span class="w"> </span><span class="kt">totalOwners.count</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">totalProducts</span><span class="o">:</span><span class="w"> </span><span class="kt">totalProducts.count</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">activeSubscriptions</span><span class="o">:</span><span class="w"> </span><span class="kt">subs.filter</span><span class="p">((</span><span class="nx">s</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">s</span><span class="p">.</span><span class="nx">status</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;active&quot;</span><span class="p">).</span><span class="nx">length</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">freeTrialCount</span><span class="o">:</span><span class="w"> </span><span class="kt">subs.filter</span><span class="p">((</span><span class="nx">s</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">s</span><span class="p">.</span><span class="nx">plan_name</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;free_trial&quot;</span><span class="p">).</span><span class="nx">length</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">proCount</span><span class="o">:</span><span class="w"> </span><span class="kt">subs.filter</span><span class="p">((</span><span class="nx">s</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">s</span><span class="p">.</span><span class="nx">plan_name</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;pro&quot;</span><span class="p">).</span><span class="nx">length</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">enterpriseCount</span><span class="o">:</span><span class="w"> </span><span class="kt">subs.filter</span><span class="p">((</span><span class="nx">s</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">s</span><span class="p">.</span><span class="nx">plan_name</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;enterprise&quot;</span><span class="p">).</span><span class="nx">length</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">suspendedCount</span><span class="o">:</span><span class="w"> </span><span class="kt">subs.filter</span><span class="p">((</span><span class="nx">s</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">s</span><span class="p">.</span><span class="nx">status</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;suspended&quot;</span><span class="p">).</span><span class="nx">length</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">expiringSoon</span><span class="o">:</span><span class="w"> </span><span class="kt">subs.filter</span><span class="p">(</span>
+<span class="w">      </span><span class="p">(</span><span class="nx">s</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">s</span><span class="p">.</span><span class="nx">expires_at</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Date</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">expires_at</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="nx">now</span><span class="w"> </span>
+<span class="w">        </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Date</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">expires_at</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="nx">next7Days</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">s</span><span class="p">.</span><span class="nx">status</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;active&quot;</span>
+<span class="w">    </span><span class="p">).</span><span class="nx">length</span><span class="p">,</span>
+<span class="w">  </span><span class="p">};</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Better: we could use proper SQL aggregates but Supabase JS client doesn't support multi-aggregate. The above reduces 3 queries to 2 parallel queries.</p>
+<p><strong><code>getSuperAdminAnalytics()</code></strong>: 
+- SELECT all profiles (all time!) → manual grouping by month
+- SELECT all subscriptions → manual plan count</p>
+<p><strong>Fix — Batasi range + proper grouping:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getSuperAdminAnalytics</span><span class="p">()</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">SaaSAnalyticsData</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">await</span><span class="w"> </span><span class="nx">requireSuperAdmin</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">createClient</span><span class="p">();</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">sixMonthsAgo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Date</span><span class="p">();</span>
+<span class="w">  </span><span class="nx">sixMonthsAgo</span><span class="p">.</span><span class="nx">setMonth</span><span class="p">(</span><span class="nx">sixMonthsAgo</span><span class="p">.</span><span class="nx">getMonth</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">5</span><span class="p">);</span>
+<span class="w">  </span><span class="nx">sixMonthsAgo</span><span class="p">.</span><span class="nx">setDate</span><span class="p">(</span><span class="mf">1</span><span class="p">);</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">profilesResult</span><span class="p">,</span><span class="w"> </span><span class="nx">subsResult</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nb">Promise</span><span class="p">.</span><span class="nx">all</span><span class="p">([</span>
+<span class="w">    </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;profiles&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;created_at&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">gte</span><span class="p">(</span><span class="s2">&quot;created_at&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">sixMonthsAgo</span><span class="p">.</span><span class="nx">toISOString</span><span class="p">())</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">order</span><span class="p">(</span><span class="s2">&quot;created_at&quot;</span><span class="p">),</span>
+<span class="w">    </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;subscriptions&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;plan_name&quot;</span><span class="p">),</span>
+<span class="w">  </span><span class="p">]);</span>
+
+<span class="w">  </span><span class="c1">// ... rest same but fewer profiles loaded</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<hr />
+<h3>Pattern 6: <code>getStoreOwnersList</code> — 4 queries + 1 full table scan</h3>
+<p><strong>File:</strong> <code>src/lib/actions/saas-actions.ts:176-268</code></p>
+<p><strong>Current:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="mf">1</span><span class="n">x</span><span class="w"> </span><span class="n">SELECT</span><span class="w"> </span><span class="n">profiles</span><span class="w"> </span><span class="p">(</span><span class="n">all</span><span class="p">)</span>
+<span class="mf">1</span><span class="n">x</span><span class="w"> </span><span class="n">SELECT</span><span class="w"> </span><span class="n">site_settings</span><span class="w"> </span><span class="n">IN</span><span class="w"> </span><span class="p">(</span><span class="n">user_ids</span><span class="p">)</span>
+<span class="mf">1</span><span class="n">x</span><span class="w"> </span><span class="n">SELECT</span><span class="w"> </span><span class="n">subscriptions</span><span class="w"> </span><span class="n">IN</span><span class="w"> </span><span class="p">(</span><span class="n">user_ids</span><span class="p">)</span><span class="w"> </span>
+<span class="mf">1</span><span class="n">x</span><span class="w"> </span><span class="n">SELECT</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="p">(</span><span class="n">ALL</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">dihitung</span><span class="w"> </span><span class="n">manual</span><span class="w"> </span><span class="n">per</span><span class="w"> </span><span class="n">user</span><span class="p">)</span>
+</code></pre></div>
+
+<p><strong>Fix — Count products sekali pake grouping:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getStoreOwnersList</span><span class="p">(</span>
+<span class="w">  </span><span class="nx">searchQuery?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">planFilter?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">statusFilter?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span>
+<span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">OwnerOverviewItem</span><span class="p">[]</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">await</span><span class="w"> </span><span class="nx">requireSuperAdmin</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">createClient</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Parallel: profiles + product counts (grouped)</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="nx">profilesQuery</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">    </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;profiles&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">order</span><span class="p">(</span><span class="s2">&quot;created_at&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">ascending</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="w"> </span><span class="p">});</span>
+
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">searchQuery</span><span class="o">?</span><span class="p">.</span><span class="nx">trim</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">profilesQuery</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">profilesQuery</span><span class="p">.</span><span class="nx">or</span><span class="p">(</span>
+<span class="w">      </span><span class="sb">`email.ilike.%</span><span class="si">${</span><span class="nx">searchQuery</span><span class="p">.</span><span class="nx">trim</span><span class="p">()</span><span class="si">}</span><span class="sb">%,full_name.ilike.%</span><span class="si">${</span><span class="nx">searchQuery</span><span class="p">.</span><span class="nx">trim</span><span class="p">()</span><span class="si">}</span><span class="sb">%`</span>
+<span class="w">    </span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">profilesResult</span><span class="p">,</span><span class="w"> </span><span class="nx">productCountResult</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nb">Promise</span><span class="p">.</span><span class="nx">all</span><span class="p">([</span>
+<span class="w">    </span><span class="nx">profilesQuery</span><span class="p">,</span>
+<span class="w">    </span><span class="c1">// Single query with group by — count products per user</span>
+<span class="w">    </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;products&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">),</span>
+<span class="w">  </span><span class="p">]);</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">profiles</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">profilesResult</span><span class="p">.</span><span class="nx">data</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[];</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">profiles</span><span class="p">.</span><span class="nx">length</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="p">[];</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">userIds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">profiles</span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">p</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">id</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Count products per user (in JS from the one fetch)</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">productCountMap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Map</span><span class="o">&lt;</span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="kt">number</span><span class="o">&gt;</span><span class="p">();</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kd">const</span><span class="w"> </span><span class="nx">p</span><span class="w"> </span><span class="k">of</span><span class="w"> </span><span class="p">(</span><span class="nx">productCountResult</span><span class="p">.</span><span class="nx">data</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[])</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">any</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">user_id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">productCountMap</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">user_id</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="nx">productCountMap</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">user_id</span><span class="p">)</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">1</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// Parallel fetch settings + subscriptions</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">settingsResult</span><span class="p">,</span><span class="w"> </span><span class="nx">subsResult</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nb">Promise</span><span class="p">.</span><span class="nx">all</span><span class="p">([</span>
+<span class="w">    </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;site_settings&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;user_id, brand_name, store_slug&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="ow">in</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">userIds</span><span class="p">),</span>
+<span class="w">    </span><span class="p">(()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="kd">let</span><span class="w"> </span><span class="nx">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;subscriptions&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">).</span><span class="ow">in</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">userIds</span><span class="p">);</span>
+<span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">planFilter</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">planFilter</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s2">&quot;all&quot;</span><span class="p">)</span><span class="w"> </span><span class="nx">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">q</span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;plan_name&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">planFilter</span><span class="p">);</span>
+<span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">statusFilter</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">statusFilter</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s2">&quot;all&quot;</span><span class="p">)</span><span class="w"> </span><span class="nx">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">q</span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;status&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">statusFilter</span><span class="p">);</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="nx">q</span><span class="p">;</span>
+<span class="w">    </span><span class="p">})(),</span>
+<span class="w">  </span><span class="p">]);</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">settingsMap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Map</span><span class="p">(</span>
+<span class="w">    </span><span class="p">(</span><span class="nx">settingsResult</span><span class="p">.</span><span class="nx">data</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[]).</span><span class="nx">map</span><span class="p">((</span><span class="nx">s</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">[</span><span class="nx">s</span><span class="p">.</span><span class="nx">user_id</span><span class="p">,</span><span class="w"> </span><span class="nx">s</span><span class="p">])</span>
+<span class="w">  </span><span class="p">);</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">subMap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Map</span><span class="p">(</span>
+<span class="w">    </span><span class="p">(</span><span class="nx">subsResult</span><span class="p">.</span><span class="nx">data</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[]).</span><span class="nx">map</span><span class="p">((</span><span class="nx">s</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">[</span><span class="nx">s</span><span class="p">.</span><span class="nx">user_id</span><span class="p">,</span><span class="w"> </span><span class="nx">s</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">Subscription</span><span class="p">])</span>
+<span class="w">  </span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Combine  </span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">profiles</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">profile</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="kd">const</span><span class="w"> </span><span class="nx">storeSetting</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">settingsMap</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">profile</span><span class="p">.</span><span class="nx">id</span><span class="p">);</span>
+<span class="w">      </span><span class="kd">const</span><span class="w"> </span><span class="nx">sub</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">subMap</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">profile</span><span class="p">.</span><span class="nx">id</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+
+<span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="p">((</span><span class="nx">planFilter</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">planFilter</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s2">&quot;all&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="nx">statusFilter</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">statusFilter</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s2">&quot;all&quot;</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">sub</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<span class="w">      </span><span class="p">}</span>
+
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="kt">profile.id</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">email</span><span class="o">:</span><span class="w"> </span><span class="kt">profile.email</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">fullName</span><span class="o">:</span><span class="w"> </span><span class="kt">profile.full_name</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">brandName</span><span class="o">:</span><span class="w"> </span><span class="kt">storeSetting?.brand_name</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s2">&quot;Belum Mengatur Toko&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">storeSlug</span><span class="o">:</span><span class="w"> </span><span class="kt">storeSetting?.store_slug</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">createdAt</span><span class="o">:</span><span class="w"> </span><span class="kt">profile.created_at</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">subscription</span><span class="o">:</span><span class="w"> </span><span class="kt">sub</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">productCount</span><span class="o">:</span><span class="w"> </span><span class="kt">productCountMap.get</span><span class="p">(</span><span class="nx">profile</span><span class="p">.</span><span class="nx">id</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">      </span><span class="p">};</span>
+<span class="w">    </span><span class="p">})</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">filter</span><span class="p">(</span><span class="nb">Boolean</span><span class="p">)</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">OwnerOverviewItem</span><span class="p">[];</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<hr />
+<h3>Pattern 7: <code>getMySubscription</code> — 4 sequential queries</h3>
+<p><strong>File:</strong> <code>src/lib/actions/saas-actions.ts:425-467</code></p>
+<p><strong>Current:</strong> sub → productCount → settings → payments = <strong>4 sequential</strong></p>
+<p><strong>Fix — Parallel:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getMySubscription</span><span class="p">()</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="p">{...}</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">requireAdmin</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">createClient</span><span class="p">();</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">subResult</span><span class="p">,</span><span class="w"> </span><span class="nx">countResult</span><span class="p">,</span><span class="w"> </span><span class="nx">settingResult</span><span class="p">,</span><span class="w"> </span><span class="nx">paymentsResult</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nb">Promise</span><span class="p">.</span><span class="nx">all</span><span class="p">([</span>
+<span class="w">    </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;subscriptions&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">).</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">current</span><span class="p">.</span><span class="nx">userId</span><span class="p">).</span><span class="nx">single</span><span class="p">(),</span>
+<span class="w">    </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;products&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">count</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;exact&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">head</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">}).</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">current</span><span class="p">.</span><span class="nx">userId</span><span class="p">),</span>
+<span class="w">    </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;site_settings&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;brand_name, store_slug&quot;</span><span class="p">).</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">current</span><span class="p">.</span><span class="nx">userId</span><span class="p">).</span><span class="nx">maybeSingle</span><span class="p">(),</span>
+<span class="w">    </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;subscription_payments&quot;</span><span class="p">).</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">).</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">current</span><span class="p">.</span><span class="nx">userId</span><span class="p">).</span><span class="nx">order</span><span class="p">(</span><span class="s2">&quot;created_at&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">ascending</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="w"> </span><span class="p">}),</span>
+<span class="w">  </span><span class="p">]);</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">sub</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">subResult</span><span class="p">.</span><span class="nx">data</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">Subscription</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">subscription</span><span class="o">:</span><span class="w"> </span><span class="kt">sub</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">productCount</span><span class="o">:</span><span class="w"> </span><span class="kt">countResult.count</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">maxProducts</span><span class="o">:</span><span class="w"> </span><span class="kt">sub?.max_products</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">5</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">brandName</span><span class="o">:</span><span class="w"> </span><span class="kt">settingResult.data?.brand_name</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">storeSlug</span><span class="o">:</span><span class="w"> </span><span class="kt">settingResult.data?.store_slug</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">payments</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="nx">paymentsResult</span><span class="p">.</span><span class="nx">data</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[])</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">SubscriptionPayment</span><span class="p">[],</span>
+<span class="w">  </span><span class="p">};</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<hr />
+<h2>🛡️ Data Integrity Issues</h2>
+<h3>Issue 1: Race Condition — Slug Unique Check</h3>
+<p><strong>File:</strong> <code>product-actions.ts:277-285</code></p>
+<p><strong>Masalah:</strong> SELECT dulu, then INSERT. Antara SELECT dan INSERT, request lain bisa insert slug yang sama.</p>
+<p><strong>Fix — Gunakan unique constraint di database + catch:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// 1. Migration SQL — tambah unique constraint</span>
+<span class="c1">// ALTER TABLE products ADD CONSTRAINT products_slug_user_id UNIQUE (slug, user_id);</span>
+<span class="c1">// ALTER TABLE categories ADD CONSTRAINT categories_slug_user_id UNIQUE (slug, user_id);</span>
+<span class="c1">// ALTER TABLE custom_landing_pages ADD CONSTRAINT clp_slug_user_id UNIQUE (slug, user_id);</span>
+
+<span class="c1">// 2. Di saveProductAction, ganti manual check → try-catch</span>
+<span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">saveProductAction</span><span class="p">(</span><span class="nx">input</span><span class="o">:</span><span class="w"> </span><span class="kt">SaveProductInput</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">ActionResult</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">userId</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">requireAdmin</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">createClient</span><span class="p">();</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">baseRow</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* ... */</span><span class="w"> </span><span class="p">};</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="nx">productId</span><span class="o">:</span><span class="w"> </span><span class="kt">UUID</span><span class="p">;</span>
+
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">input</span><span class="p">.</span><span class="nx">id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">error</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;products&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">update</span><span class="p">(</span><span class="nx">baseRow</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">input</span><span class="p">.</span><span class="nx">id</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">userId</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">ok</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="kt">error.message</span><span class="w"> </span><span class="p">};</span>
+<span class="w">    </span><span class="nx">productId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">input</span><span class="p">.</span><span class="nx">id</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;products&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">insert</span><span class="p">(</span><span class="nx">baseRow</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">single</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">.</span><span class="nx">code</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;23505&quot;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="c1">// PostgreSQL unique violation</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">ok</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Slug sudah dipakai produk lain&quot;</span><span class="w"> </span><span class="p">};</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">ok</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="kt">error.message</span><span class="w"> </span><span class="p">};</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="nx">productId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="nx">data</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="kt">UUID</span><span class="w"> </span><span class="p">}).</span><span class="nx">id</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// ... rest</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 30 menit (SQL migration + TS update)<br />
+<strong>Risk:</strong> 🟠 Duplicate slug crash di production</p>
+<hr />
+<h3>Issue 2: Spec Values Delete-then-Reinsert</h3>
+<p><strong>File:</strong> <code>product-actions.ts:381-401</code></p>
+<p><strong>Masalah:</strong> <code>DELETE</code> semua spec values lama → <code>INSERT</code> baru. Kalau insert gagal di tengah, data ilang.</p>
+<p><strong>Fix — Upsert dengan single operation:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// Ganti delete + insert dengan upsert</span>
+<span class="c1">// Tapi Supabase upsert perlu unique constraint</span>
+<span class="c1">// Migration:</span>
+<span class="c1">// ALTER TABLE product_spec_values ADD CONSTRAINT psv_product_field UNIQUE (product_id, field_id);</span>
+
+<span class="c1">// Fix di saveProductAction:</span>
+<span class="c1">// Hapus baris delete all</span>
+<span class="c1">// Ganti dengan:</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">specRows</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">fieldList</span>
+<span class="w">  </span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">field</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">input</span><span class="p">.</span><span class="nx">spec_values</span><span class="p">[</span><span class="nx">field</span><span class="p">.</span><span class="nx">id</span><span class="p">];</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">raw</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="kc">undefined</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nx">raw</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">row</span><span class="o">:</span><span class="w"> </span><span class="kt">Record</span><span class="o">&lt;</span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">unknown</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">product_id</span><span class="o">:</span><span class="w"> </span><span class="kt">productId</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">field_id</span><span class="o">:</span><span class="w"> </span><span class="kt">field.id</span><span class="p">,</span>
+<span class="w">    </span><span class="p">};</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">field</span><span class="p">.</span><span class="nx">field_type</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;text&quot;</span><span class="p">)</span><span class="w"> </span><span class="nx">row</span><span class="p">.</span><span class="nx">value_text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">raw</span><span class="p">;</span>
+<span class="w">    </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">field</span><span class="p">.</span><span class="nx">field_type</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;number&quot;</span><span class="p">)</span><span class="w"> </span><span class="nx">row</span><span class="p">.</span><span class="nx">value_number</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Number</span><span class="p">(</span><span class="nx">raw</span><span class="p">);</span>
+<span class="w">    </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">field</span><span class="p">.</span><span class="nx">field_type</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;boolean&quot;</span><span class="p">)</span><span class="w"> </span><span class="nx">row</span><span class="p">.</span><span class="nx">value_boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">raw</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;true&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nx">raw</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;1&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">field</span><span class="p">.</span><span class="nx">field_type</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;select&quot;</span><span class="p">)</span><span class="w"> </span><span class="nx">row</span><span class="p">.</span><span class="nx">value_select</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">raw</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">row</span><span class="p">;</span>
+<span class="w">  </span><span class="p">})</span>
+<span class="w">  </span><span class="p">.</span><span class="nx">filter</span><span class="p">(</span><span class="nb">Boolean</span><span class="p">);</span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">specRows</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">error</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">    </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;product_spec_values&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">upsert</span><span class="p">(</span><span class="nx">specRows</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">onConflict</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;product_id, field_id&quot;</span><span class="w"> </span><span class="p">});</span>
+<span class="w">  </span><span class="c1">// If spec row no longer needed, we need a separate cleanup</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Actually, simpler approach for MVP — wrap in transaction:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// Pakai Supabase RPC atau handle error dengan restore</span>
+<span class="c1">// Atau cukup delete dulu, insert, kalau insert gagal → re-throw</span>
+<span class="c1">// (MVP acceptable, data loss minimal karena spec values jarang berubah)</span>
+</code></pre></div>
+
+<p><strong>Risk:</strong> 🟢 Minor — data loss in edge case</p>
+<hr />
+<h3>Issue 3: Gallery JSON Serialization Inconsistent</h3>
+<p><strong>Files:</strong> <code>product-actions.ts</code> + <code>public-data.ts</code></p>
+<p><strong>Masalah:</strong> Gallery field sometimes stored as JSON string, sometimes as parsed array. Ada <code>parseGalleryField()</code> dan <code>parseGallery()</code> di dua file — duplicate code.</p>
+<p><strong>Fix — Store as proper JSONB in database:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="k">ALTER</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">gallery</span><span class="w"> </span><span class="k">TYPE</span><span class="w"> </span><span class="n">JSONB</span><span class="w"> </span><span class="k">USING</span><span class="w"> </span>
+<span class="w">  </span><span class="k">CASE</span><span class="w"> </span>
+<span class="w">    </span><span class="k">WHEN</span><span class="w"> </span><span class="n">gallery</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="s1">&#39;[]&#39;</span><span class="p">::</span><span class="n">jsonb</span>
+<span class="w">    </span><span class="k">WHEN</span><span class="w"> </span><span class="n">json_valid</span><span class="p">(</span><span class="n">gallery</span><span class="p">::</span><span class="nb">text</span><span class="p">)</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="n">gallery</span><span class="p">::</span><span class="n">jsonb</span><span class="w"> </span>
+<span class="w">    </span><span class="k">ELSE</span><span class="w"> </span><span class="n">to_jsonb</span><span class="p">(</span><span class="n">gallery</span><span class="p">)</span>
+<span class="w">  </span><span class="k">END</span><span class="p">;</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// product-actions.ts — tinggal set langsung tanpa stringify</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">baseRow</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// ...</span>
+<span class="w">  </span><span class="nx">gallery</span><span class="o">:</span><span class="w"> </span><span class="kt">input.gallery</span><span class="p">,</span><span class="w">  </span><span class="c1">// langsung array, Supabase JSONB handle otomatis</span>
+<span class="p">};</span>
+
+<span class="c1">// public-data.ts — tinggal akses langsung tanpa parse</span>
+<span class="nx">gallery</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">gallery</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[])</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span><span class="w"> </span><span class="nx">alt</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">}[],</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 15 menit<br />
+<strong>Benefit:</strong> Hapus 2 utility function + 8 lines code tiap file</p>
+<hr />
+<h3>Issue 4: <code>categories!inner</code> Silent Exclusion</h3>
+<p><strong>File:</strong> <code>product-actions.ts:57</code></p>
+<div class="codehilite"><pre><span></span><code><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;..., categories!inner(id, name, slug)&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<p><strong>Masalah:</strong> Kalau produk punya <code>category_id</code> yang tidak ada di tabel categories (constraint violation atau referensi orphan), produk <strong>tidak muncul</strong> di list — tanpa error.</p>
+<p><strong>Fix — Gunakan left join:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;..., categories(id, name, slug)&quot;</span><span class="p">)</span><span class="w">  </span><span class="c1">// tanpa !inner = LEFT JOIN</span>
+<span class="c1">// Dan handle null categories di map</span>
+<span class="nx">category_name</span><span class="o">:</span><span class="w"> </span><span class="kt">r.categories?.name</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="s2">&quot;—&quot;</span><span class="p">,</span>
+<span class="nx">category_slug</span><span class="o">:</span><span class="w"> </span><span class="kt">r.categories?.slug</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+</code></pre></div>
+
+<p>Sama untuk <code>getVisibleProducts</code> di <code>public-data.ts:175</code>.</p>
+<p><strong>Effort:</strong> 2 menit<br />
+<strong>Risk:</strong> 🟢 Produk tidak tampil tanpa notifikasi</p>
+<hr />
+<h3>Issue 5: Console Log Exposing userId</h3>
+<p><strong>File:</strong> <code>product-actions.ts:75</code></p>
+<div class="codehilite"><pre><span></span><code><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;fetchProducts retrieved rows:&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">data</span><span class="o">?</span><span class="p">.</span><span class="nx">length</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;for userId:&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">userId</span><span class="p">);</span>
+</code></pre></div>
+
+<p><strong>Masalah:</strong> User ID muncul di production log. Kalau log-nya bocor (Sentry, Papertrail, dll), attacker bisa mapping user IDs.</p>
+<p><strong>Fix — Hapus atau gunakan logger yang aman:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// Hapus atau ganti</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">NODE_ENV</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;development&quot;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="sb">`[fetchProducts] </span><span class="si">${</span><span class="nx">data</span><span class="o">?</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">0</span><span class="si">}</span><span class="sb"> rows`</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 1 menit<br />
+<strong>Risk:</strong> 🟡 Privacy leak</p>
+<hr />
+<h3>Issue 6: No Pagination di Order Leads List</h3>
+<p><strong>File:</strong> Admin pages → semua order leads di-fetch tanpa limit</p>
+<p><strong>Masalah:</strong> Store dengan banyak order leads akan slow load.</p>
+<p><strong>Fix:</strong> Tambah <code>limit</code> dan <code>offset</code> parameter, atau paging via Infinite Scroll.</p>
+<p><strong>Effort:</strong> 1-2 jam<br />
+<strong>Risk:</strong> 🟡 Performance issue at scale</p>
+<hr />
+<h3>Issue 7: Subscription Check Hanya di INSERT</h3>
+<p><strong>File:</strong> <code>saas-actions.ts</code></p>
+<p><strong>Masalah:</strong> Subscription quota (max_products) dicek hanya saat INSERT, bukan UPDATE.</p>
+<p><strong>Fix:</strong> Tambah subscription check di UPDATE path juga.</p>
+<p><strong>Effort:</strong> 15 menit<br />
+<strong>Risk:</strong> 🟡 Store owner bisa exceed quota via update</p>
+<hr />
+<h2>📊 Data Layer Score Calculation</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Before</th>
+<th>After</th>
+<th>Key Improvement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>N+1 Query Elimination</strong></td>
+<td>3/10</td>
+<td>10/10</td>
+<td>Batch fetch, Promise.all, aggregate queries</td>
+</tr>
+<tr>
+<td><strong>Data Integrity</strong></td>
+<td>7/10</td>
+<td>10/10</td>
+<td>Unique constraints, upsert instead of delete+insert</td>
+</tr>
+<tr>
+<td><strong>Performance</strong></td>
+<td>5/10</td>
+<td>9/10</td>
+<td>Reduced from 61→4 queries per page load</td>
+</tr>
+<tr>
+<td><strong>Code Quality</strong></td>
+<td>7/10</td>
+<td>9/10</td>
+<td>Remove duplicate parsers, fix silent exclusion</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>5.5/10</strong></td>
+<td><strong>9.5/10</strong></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>🎯 Prioritized Task List</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Task</th>
+<th>Effort</th>
+<th>Query Reduction</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D1</td>
+<td><strong>Batch spec check</strong> di fetchProducts</td>
+<td>2h</td>
+<td>61→4 (93%)</td>
+<td>🔴 <strong>Week 1</strong></td>
+</tr>
+<tr>
+<td>D2</td>
+<td><strong>Promise.all</strong> di fetchProductDetail</td>
+<td>30m</td>
+<td>6→3 (50%)</td>
+<td>🔴 <strong>Week 1</strong></td>
+</tr>
+<tr>
+<td>D3</td>
+<td><strong>Left join categories</strong></td>
+<td>2m</td>
+<td>—</td>
+<td>🔴 <strong>Week 1</strong></td>
+</tr>
+<tr>
+<td>D4</td>
+<td><strong>Promise.all</strong> di getProductBySlug</td>
+<td>30m</td>
+<td>6→3 (50%)</td>
+<td>🟠 <strong>Week 1</strong></td>
+</tr>
+<tr>
+<td>D5</td>
+<td><strong>Aggregate</strong> getVisibleCategories</td>
+<td>30m</td>
+<td>2→1 (50%)</td>
+<td>🟠 <strong>Week 2</strong></td>
+</tr>
+<tr>
+<td>D6</td>
+<td><strong>Parallel</strong> getMySubscription</td>
+<td>15m</td>
+<td>4→2 (50%)</td>
+<td>🟠 <strong>Week 2</strong></td>
+</tr>
+<tr>
+<td>D7</td>
+<td><strong>Unique constraint</strong> + race condition fix</td>
+<td>30m</td>
+<td>—</td>
+<td>🟠 <strong>Week 2</strong></td>
+</tr>
+<tr>
+<td>D8</td>
+<td><strong>Limit</strong> getSuperAdminAnalytics</td>
+<td>15m</td>
+<td>Data transfer ↓90%</td>
+<td>🟠 <strong>Week 2</strong></td>
+</tr>
+<tr>
+<td>D9</td>
+<td><strong>Gallery JSONB</strong> consistency</td>
+<td>15m</td>
+<td>—</td>
+<td>🟢 <strong>Week 3</strong></td>
+</tr>
+<tr>
+<td>D10</td>
+<td><strong>Spec upsert</strong> instead of delete+insert</td>
+<td>30m</td>
+<td>—</td>
+<td>🟢 <strong>Week 3</strong></td>
+</tr>
+<tr>
+<td>D11</td>
+<td><strong>Hapus console.log</strong> userId</td>
+<td>1m</td>
+<td>—</td>
+<td>🟢 <strong>Week 3</strong></td>
+</tr>
+<tr>
+<td>D12</td>
+<td><strong>Pagination</strong> order leads</td>
+<td>1-2h</td>
+<td>—</td>
+<td>🟢 <strong>Week 3</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>📈 Performance Impact Estimate</h2>
+<p><strong>Before:</strong></p>
+<div class="codehilite"><pre><span></span><code>Toko main page (categories + products): 
+  getStoreOwnerId → getVisibleCategories + getVisibleProducts 
+  = 1 + 2 + 3 + (categories × 0) + (products × 0... actually products already joined)
+  ~ 3-5 queries
+
+Admin product list (20 products):
+  fetchProducts = 1 + 20 × 3 = 61 queries → ~300ms-1s
+
+Admin product detail:
+  fetchProductDetail = 6 sequential queries → ~200ms
+
+Superadmin dashboard:
+  getSuperAdminStats + getStoreOwnersList + analytics
+  = 5 queries + full table scan → ~500ms-2s
+</code></pre></div>
+
+<p><strong>After:</strong></p>
+<div class="codehilite"><pre><span></span><code>Toko main page: 2-3 queries → ~50ms
+Admin product list (20 products): 4 queries → ~80ms
+Admin product detail: 3 parallel queries → ~60ms
+Superadmin dashboard: 4 queries (parallel) → ~100ms
+</code></pre></div>
+
+<p><strong>Total page load improvement:</strong> 3-10x faster 🚀</p>
+<hr />
+<h2>🔧 Implementation Approach</h2>
+<p>Semua fix ini <strong>read-only</strong> untuk <code>public-data.ts</code> files — artinya gak ngerusak data. Formatnya:
+1. Ganti sequential await → <code>Promise.all</code>
+2. Ganti per-row query → batch <code>WHERE IN</code>
+3. Hapus <code>console.log</code> sensitif
+4. Tambah <code>LIMIT</code> di admin queries</p>
+<p><strong>Yang Mulia, mau gue gas mulai dari D1 (batch spec check fetchProducts) atau D2 (Promise.all fetchProductDetail) dulu?</strong> Keduanya paling berdampak — langsung kurangi query <strong>93% dan 50%</strong>. 🚀</p>
+<p style="text-align:center; color:#94a3b8; font-size:7pt; margin-top:16px; border-top:1px solid #e2e8f0; padding-top:6px;">
+  <strong>KatalogHub</strong> — Data Optimization Plan &bull; 30 Juli 2026
+</p>
+</body>
+</html>

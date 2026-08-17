@@ -1,0 +1,111 @@
+================================================================
+ROADMAP INSTALASI VPS DOMAINESIA + COOLIFY
+Proyek: KatalogHub (Next.js + Supabase)
+Dibuat untuk: Yang Mulia (belajar self-hosting)
+================================================================
+
+--- TAHAP 0: SEBELUM MULAI ---
+1. Beli "Cloud VPS" (bukan Shared Hosting) di DomaiNesia.
+2. Pilih OS: Ubuntu 22.04 LTS (atau 24.04 LTS).
+3. Catat 3 hal penting dari email DomaiNesia:
+   - IP Address VPS   (contoh: 203.0.113.10)
+   - Username         (biasanya: root)
+   - Password root
+4. Pastikan domain sudah di-pointing ke IP VPS (di DNS DomaiNesia):
+   - A record  @        -> IP_VPS
+   - A record  www      -> IP_VPS
+   - A record  toko     -> IP_VPS   (jika pakai subdomain toko)
+
+================================================================
+--- TAHAP 1: LOGIN KE VPS ---
+Buka terminal di komputer lokal Yang Mulia, lalu:
+
+    ssh root@IP_VPS
+
+(Masukkan password saat diminta. Jika pakai Windows, gunakan
+ Git Bash / PowerShell / Terminal Hermes.)
+
+================================================================
+--- TAHAP 2: UPDATE SISTEM ---
+Copy-paste perintah berikut satu per satu:
+
+    apt update && apt upgrade -y
+    apt install curl wget git -y
+
+================================================================
+--- TAHAP 3: INSTAL DOCKER ---
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh
+    docker --version
+
+(Pastikan keluarannya ada tulisan "Docker version ...")
+
+================================================================
+--- TAHAP 4: INSTAL COOLIFY ---
+    curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+
+(Tunggu hingga selesai._biasanya 2-5 menit.)
+
+================================================================
+--- TAHAP 5: AKSES DASHBOARD COOLIFY ---
+1. Buka browser, ketik:  http://IP_VPS:8000
+2. Buat akun admin pertama (email + password kuat).
+3. Coolify akan otomatis set SSL (Let's Encrypt) nanti.
+
+================================================================
+--- TAHAP 6: HUBUNGKAN GITHUB ---
+Di dashboard Coolify:
+    Projects > New Project
+    > Connect Repository (GitHub)
+    > Authorize Coolify
+    > Pilih repo: kataloghub
+
+================================================================
+--- TAHAP 7: BUAT RESOURCE "Application" ---
+1. Pilih "New Resource" > "Application" > "Public Repository / GitHub".
+2. Pilih branch: main (atau master).
+3. Build pack: Nixpacks (otomatis detect Next.js).
+4. Domain: isi domain Yang Mulia (contoh: kataloghub.com).
+5. Klik "Deploy".
+
+================================================================
+--- TAHAP 8: SET ENVIRONMENT VARIABLES ---
+Wajib diisi di menu "Environment" Coolify (jangan commit ke Git!):
+
+    NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxxx
+    SUPABASE_SERVICE_ROLE_KEY=eyJxxxx
+    NODE_ENV=production
+
+(Salin nilai ini dari project Supabase -> Settings -> API.)
+
+================================================================
+--- TAHAP 9: VERIFIKASI ---
+1. Buka http://domain-yang-mulia.com
+2. Cek:
+   - Halaman toko muncul?
+   - Login admin bisa?
+   - Upload produk jalan?
+3. Cek Logs di Coolify kalau ada error.
+
+================================================================
+--- CATATAN KEAMANAN (PENTING) ---
+- JANGAN taruh file .env di repo GitHub.
+- Ganti password root VPS dengan yang kuat:
+      passwd root
+- Aktifkan firewall bawaan (opsional tapi bagus):
+      ufw allow 22,80,443,8000/tcp
+      ufw enable
+
+================================================================
+--- TROUBLESHOOTING CEPAT ---
+- Site tidak muncul? Cek DNS sudah propagate (pakai:
+  https://whatsmydns.net).
+- Deploy gagal? Cek tab "Logs" di Coolify untuk pesan error.
+- Port 8000 terbuka tapi tidak load? Restart container:
+      docker restart coolify
+
+================================================================
+Status: Siap dieksekusi setelah VPS aktif.
+Dibuat oleh: Partner Coding Yang Mulia.
+================================================================

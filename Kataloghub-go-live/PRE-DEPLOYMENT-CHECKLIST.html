@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>KatalogHub — Pre-Deployment Checklist</title>
+<style>
+/* ───────────── Print / Screen Styles ───────────── */
+@page {
+  size: A4;
+  margin: 18mm 16mm 22mm 16mm;
+  @bottom-center {
+    content: counter(page) " / " counter(pages);
+    font-size: 8pt;
+    color: #94a3b8;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+  }
+}
+
+@media print {
+  body { font-size: 8.5pt; }
+  pre { page-break-inside: avoid; }
+  h2, h3 { page-break-after: avoid; }
+  table { page-break-inside: avoid; }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Helvetica Neue', Arial, 'Segoe UI', sans-serif;
+  font-size: 9pt;
+  line-height: 1.55;
+  color: #1e293b;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 0 10px;
+}
+
+/* ───────────── Cover / Title ───────────── */
+.title-block {
+  text-align: center;
+  padding: 30px 0 20px 0;
+  border-bottom: 4px solid #6366f1;
+  margin-bottom: 20px;
+}
+.title-block h1 {
+  font-size: 22pt;
+  color: #111827;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
+}
+.title-block .subtitle {
+  font-size: 11pt;
+  color: #6366f1;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+.title-block .meta {
+  font-size: 8pt;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* ───────────── Headings ───────────── */
+h1 {
+  font-size: 15pt;
+  color: #111827;
+  border-bottom: 3px solid #6366f1;
+  padding-bottom: 5px;
+  margin: 24px 0 12px 0;
+}
+h2 {
+  font-size: 12pt;
+  color: #4338ca;
+  border-bottom: 1.5px solid #c7d2fe;
+  padding-bottom: 3px;
+  margin: 20px 0 10px 0;
+}
+h3 {
+  font-size: 10pt;
+  color: #1e293b;
+  margin: 16px 0 8px 0;
+}
+h4 {
+  font-size: 9pt;
+  color: #334155;
+  margin: 12px 0 6px 0;
+}
+
+/* ───────────── Code ───────────── */
+code {
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+  font-size: 7.5pt;
+  background: #f1f5f9;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #0f172a;
+  word-break: break-word;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 7pt;
+  line-height: 1.45;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+/* ───────────── Tables ───────────── */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 8pt;
+  margin: 8px 0 14px 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+th {
+  background: #eef2ff;
+  text-align: left;
+  padding: 5px 8px;
+  border: 1px solid #cbd5e1;
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 7.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+td {
+  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+/* ───────────── Lists ───────────── */
+ul, ol {
+  padding-left: 20px;
+  margin: 4px 0 8px 0;
+}
+li {
+  margin: 2px 0;
+}
+li > p { margin: 0; }
+
+/* ───────────── Paragraphs & Text ───────────── */
+p {
+  margin: 4px 0 8px 0;
+}
+strong { color: #0f172a; }
+blockquote {
+  border-left: 4px solid #6366f1;
+  padding: 6px 12px;
+  margin: 10px 0;
+  background: #f8fafc;
+  color: #475569;
+  border-radius: 0 6px 6px 0;
+}
+hr {
+  border: none;
+  border-top: 2px solid #cbd5e1;
+  margin: 20px 0;
+}
+
+/* ───────────── Score Badges ───────────── */
+.score-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 8pt;
+}
+.score-red { background: #fef2f2; color: #dc2626; }
+.score-orange { background: #fff7ed; color: #ea580c; }
+.score-green { background: #f0fdf4; color: #16a34a; }
+
+/* ───────────── Checklist overrides ───────────── */
+.unchecked { color: #94a3b8; font-size: 11pt; }
+.checked { color: #22c55e; font-size: 11pt; }
+
+/* ───────────── Severity indicators ───────────── */
+.severity-critical { color: #dc2626; font-weight: 700; }
+.severity-high { color: #ea580c; font-weight: 600; }
+.severity-medium { color: #ca8a04; }
+
+/* ───────────── Page breaks ───────────── */
+.page-break { page-break-before: always; }
+@media screen {
+  .page-break { border-top: 2px dashed #cbd5e1; margin: 30px 0; padding-top: 10px; }
+}
+
+/* ───────────── Two-column for summary ───────────── */
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 10px 0;
+}
+.summary-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fafafa;
+}
+.summary-card .label {
+  font-size: 7pt;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  font-weight: 600;
+}
+.summary-card .value {
+  font-size: 14pt;
+  font-weight: 800;
+  margin-top: 2px;
+}
+</style>
+</head>
+<body>
+
+<div class="title-block">
+  <h1>🚀 KatalogHub — Pre-Deployment Production Checklist</h1>
+  <p class="subtitle">Full Codebase Review untuk Go-Live Readiness</p>
+  <p class="meta">Audit Date: 30 Juli 2026 &nbsp;|&nbsp; Auditor: AI-assisted &nbsp;|&nbsp; Target: DomaiNesia VPS → Coolify</p>
+</div>
+
+<h1>🚀 KatalogHub — Pre-Deployment Production Checklist</h1>
+<blockquote>
+<p><strong>Audit Date:</strong> 30 Juli 2026<br />
+<strong>Target:</strong> DomaiNesia Cloud VPS → Coolify → Docker<br />
+<strong>Total Files Reviewed:</strong> ~40+ component/page/action files across full stack</p>
+</blockquote>
+<hr />
+<h2>📊 Ringkasan Score Card</h2>
+<table>
+<thead>
+<tr>
+<th>Dimensi</th>
+<th>Score</th>
+<th>Keterangan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Keamanan &amp; Auth</strong></td>
+<td>6/10</td>
+<td>Service-role key everywhere, no RLS, no rate limit</td>
+</tr>
+<tr>
+<td><strong>Data Integrity</strong></td>
+<td>8/10</td>
+<td>Zod validation solid, slug unique check ada</td>
+</tr>
+<tr>
+<td><strong>Performance</strong></td>
+<td>5/10</td>
+<td>Semua <code>force-dynamic</code>, no cache, N+1 queries</td>
+</tr>
+<tr>
+<td><strong>SEO &amp; Metadata</strong></td>
+<td>4/10</td>
+<td>Minimal OG/Twitter cards, no sitemap</td>
+</tr>
+<tr>
+<td><strong>Error Handling</strong></td>
+<td>6/10</td>
+<td>Try/catch ada, tapi console.log masih numpang</td>
+</tr>
+<tr>
+<td><strong>Monitoring</strong></td>
+<td>1/10</td>
+<td>Zero error tracking, Sentry/etc not installed</td>
+</tr>
+<tr>
+<td><strong>DevOps Readiness</strong></td>
+<td>3/10</td>
+<td>No Dockerfile, no healthcheck, no CI</td>
+</tr>
+<tr>
+<td><strong>UX Mobile</strong></td>
+<td>8/10</td>
+<td>Touch-friendly, responsive sudah baik</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>5.1/10</strong></td>
+<td><strong>Layak staging, perlu ~2-3 minggu untuk production-grade</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>🚨 BLOKIR KRITIS — Harus Fix SEBELUM Go-Live</h2>
+<h3>1. 🔴 Wrong Redirect Path in <code>requireAdmin()</code></h3>
+<p><strong>File:</strong> <code>src/lib/auth.ts</code> line 48</p>
+<div class="codehilite"><pre><span></span><code><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">current</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">redirect</span><span class="p">(</span><span class="s2">&quot;/login&quot;</span><span class="p">);</span><span class="w"> </span><span class="c1">// WRONG! Harusnya &quot;/admin/login&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Dampak:</strong> Kalau session admin expired/not authenticated, di-redirect ke <code>/login</code> (404) bukan <code>/admin/login</code> — user bakal lihat halaman rusak.<br />
+<strong>Fix:</strong> Ganti jadi <code>redirect("/admin/login")</code>.</p>
+<h3>2. 🔴 Semua Query Pakai Service Role Key (Bypass RLS)</h3>
+<p><strong>Pattern di seluruh codebase:</strong> <code>createAdminClient()</code> = Supabase <code>service_role</code> key.<br />
+<strong>Dampak:</strong> Service_role BYPASS RLS total. Kalau ada server-side bug (SSRF, path traversal) atau env variable leak di client build, semua data tenant bisa bocor.<br />
+<strong>Mitigasi:</strong> 
+- Firewall ketat di Coolify — cuma Next.js server boleh akses Supabase
+- Jangan pernah export <code>NEXT_PUBLIC_SUPABASE_SERVICE_ROLE</code> (cuma boleh <code>SUPABASE_SERVICE_ROLE</code> server-only)
+- Opsional: migrasi bertahap ke <code>createClient()</code> (anon key + RLS policies)</p>
+<h3>3. 🔴 No Security Headers</h3>
+<p><strong>File:</strong> <code>next.config.ts</code> — cuma ada <code>experimental.serverActions.bodySizeLimit</code> dan <code>images.remotePatterns</code>.<br />
+<strong>Dampak:</strong> Rentan clickjacking, XSS, MIME sniffing.<br />
+<strong>Fix:</strong> Tambah security headers:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="nx">headers</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">[{</span>
+<span class="w">    </span><span class="nx">source</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;/(.*)&#39;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;X-Frame-Options&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;DENY&#39;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;X-Content-Type-Options&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;nosniff&#39;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Referrer-Policy&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;strict-origin-when-cross-origin&#39;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Strict-Transport-Security&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;max-age=63072000; includeSubDomains; preload&#39;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="w">  </span><span class="p">}]</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3>4. 🔴 XSS Risk di Custom Landing Page</h3>
+<p><strong>File:</strong> <code>src/app/lp/[slug]/route.ts</code><br />
+<strong>Dampak:</strong> <code>page.html_source</code> dirender langsung via <code>new NextResponse(html, ...)</code>. Store owner bisa inject script.<br />
+<strong>Mitigasi:</strong> Pastikan hanya TRUSTED store owner (bukan public) yang bisa publish LP. Atau gunakan DOMPurify di server side.</p>
+<h3>5. 🔴 Superadmin bisa diakses oleh siapa pun dengan <code>is_admin=true</code></h3>
+<p><strong>File:</strong> <code>src/lib/auth.ts</code> line 66-67  </p>
+<div class="codehilite"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">isSuper</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">current</span><span class="p">.</span><span class="nx">profile</span><span class="p">.</span><span class="nx">role</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;superadmin&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nx">current</span><span class="p">.</span><span class="nx">profile</span><span class="p">.</span><span class="nx">is_admin</span><span class="p">;</span>
+</code></pre></div>
+
+<p><strong>Dampak:</strong> Admin biasa dengan <code>is_admin=true</code> bisa akses /superadmin.<br />
+<strong>Fix:</strong> Hapus fallback <code>is_admin</code> — superadmin harus explicit role.</p>
+<h3>6. 🔴 Bootstrap Admin Endpoint Rawan</h3>
+<p><strong>File:</strong> <code>src/app/admin/bootstrap/action/route.ts</code><br />
+<strong>Dampak:</strong> Endpoint tanpa CSRF protection, tanpa rate limiting. Kalau somehow <code>has_no_admin()</code> RPC error, bisa bypass.<br />
+<strong>Fix:</strong> Tambah CSRF token + rate limiter, atau matikan endpoint setelah bootstrap sukses.</p>
+<h3>7. 🔴 Default Bank Accounts Hardcoded</h3>
+<p><strong>File:</strong> <code>src/lib/actions/saas-actions.ts</code> lines 486-511<br />
+<strong>Dampak:</strong> Rekening BCA &amp; Mandiri hardcoded sebagai fallback. Kalau tabel <code>platform_bank_accounts</code> kosong, data rekening palsu ter-expose.<br />
+<strong>Fix:</strong> Jangan pernah hardcode rekening. Hanya tampilkan dari database.</p>
+<hr />
+<h2>⚠️ HIGH PRIORITY — Fix Sebelum Launch Marketing</h2>
+<h3>8. 🟠 <code>force-dynamic</code> di SEMUA Halaman — No Cache</h3>
+<p><strong>Files:</strong> Hampir semua page.tsx di storefront, admin, kategori, produk<br />
+<strong>Dampak:</strong> Setiap request query database. Tidak scalable.<br />
+<strong>Fix:</strong>
+- Gunakan <code>revalidate</code> atau ISR untuk halaman public (toko, produk, kategori)
+- Gunakan <code>generateStaticParams</code> untuk produk/kategori yang sudah publish
+- Admin dashboard boleh tetap dynamic (internal only)</p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// Contoh fix di toko/[store_slug]/produk/[slug]/page.tsx</span>
+<span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">revalidate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">60</span><span class="p">;</span><span class="w"> </span><span class="c1">// ISR tiap 60 detik</span>
+</code></pre></div>
+
+<h3>9. 🟠 Rate Limiting di Semua Endpoint</h3>
+<p><strong>Endpoint vulnerable:</strong>
+- <code>POST /admin/login/action</code> (brute force login)
+- <code>POST /api/order-lead</code> (spam leads)
+- <code>POST /admin/bootstrap/action</code> (registration abuse)
+- <code>PATCH /api/track</code> (tracking abuse)
+<strong>Fix:</strong> Pakai <code>@upstash/ratelimit</code> atau middleware-based rate limiting.</p>
+<h3>10. 🟠 Login Brute Force Protection</h3>
+<p><strong>File:</strong> <code>src/app/admin/login/login-form.tsx</code><br />
+<strong>Fix:</strong> Implement exponential backoff, captcha (Turnstile/grecaptcha), atau lockout after 5 failed attempts.</p>
+<h3>11. 🟠 Console Log di Production</h3>
+<p><strong>Files:</strong> 
+- <code>product-actions.ts:75</code> — <code>console.log("fetchProducts retrieved rows:", ...)</code>
+- <code>public-data.ts:34,55,86,198</code> — <code>console.error("[...]")</code><br />
+<strong>Dampak:</strong> Memory leak + log polusi.<br />
+<strong>Fix:</strong> Ganti dengan logger service atau hapus.</p>
+<h3>12. 🟠 No Proper 404 Page</h3>
+<p><strong>File:</strong> <code>src/app/not-found.tsx</code> — Nampilin "Dalam Tahap Pengembangan"<br />
+<strong>Dampak:</strong> User bingung, kesan apps belum jadi.<br />
+<strong>Fix:</strong> Ganti dengan 404 page yang proper (branded, cari produk lain, link ke toko).</p>
+<h3>13. 🟠 N+1 Query di <code>fetchProducts</code></h3>
+<p><strong>File:</strong> <code>src/lib/actions/product-actions.ts</code> lines 91-109<br />
+<strong>Dampak:</strong> Setiap fetch products → 1 query SELECT + N query <code>checkRequiredSpecsFilled</code>. Kalau 100 produk = 101 queries.<br />
+<strong>Fix:</strong> Batch check specs via single Supabase query, bukan per-loop.</p>
+<h3>14. 🟠 Subscription Check Hanya di INSERT, Bukan UPDATE</h3>
+<p><strong>File:</strong> <code>product-actions.ts</code> lines 331-358<br />
+<strong>Dampak:</strong> User expired subscription masih bisa UPDATE produk existing (gambar, deskripsi). Cuma INSERT produk baru yang dicek.<br />
+<strong>Fix:</strong> Pindah subscription check ke function terpisah, panggil baik di insert maupun update.</p>
+<h3>15. 🟠 No Error Monitoring (Sentry/Logtail)</h3>
+<p><strong>Dampak:</strong> Kalau di production error 500 atau crash, lo gak bakal tahu.<br />
+<strong>Fix:</strong> Integrasi Sentry untuk Next.js:</p>
+<div class="codehilite"><pre><span></span><code>npm<span class="w"> </span>install<span class="w"> </span>@sentry/nextjs
+npx<span class="w"> </span>sentry-wizard<span class="w"> </span>-i<span class="w"> </span>nextjs
+</code></pre></div>
+
+<h3>16. 🟠 Order Leads Table Tanpa Pagination</h3>
+<p><strong>File:</strong> <code>admin/(shell)/orders/page.tsx</code><br />
+<strong>Dampak:</strong> Toko dengan ribuan leads akan nge-load semua data dalam 1 query.<br />
+<strong>Fix:</strong> Tambah pagination / infinite scroll + server-side <code>range()</code>.</p>
+<hr />
+<h2>📋 MEDIUM — Improve dalam 1-2 Minggu</h2>
+<h3>17. SEO Metadata</h3>
+<ul>
+<li>Tambah <code>generateMetadata</code> di SEMUA halaman toko (sudah ada di produk &amp; kategori, tapi tidak konsisten)</li>
+<li>Tambah Open Graph (<code>og:image</code>, <code>og:title</code>, <code>og:description</code>) di layout</li>
+<li>Tambah Twitter Cards</li>
+<li>Generate <code>sitemap.xml</code> + <code>robots.txt</code></li>
+</ul>
+<h3>18. Social Link Placeholders</h3>
+<p><strong>File:</strong> Layout promo/footer — beberapa link sosmed masih placeholder (<code>#</code>). Fix sebelum traffic datang.</p>
+<h3>19. Supabase Storage RLS</h3>
+<p>Storage bucket harus punya RLS policy: publik hanya bisa READ, admin (authenticated) bisa WRITE.</p>
+<h3>20. Hydration Mismatch: <code>new Date().getFullYear()</code></h3>
+<p><strong>Files:</strong> 
+- <code>admin/login/page.tsx:46</code> — <code>{new Date().getFullYear()}</code>
+- Promo layout footer
+<strong>Dampak:</strong> Server render tahun X, client render tahun X+... no problem actually untuk tahun, kecuali kalau SSR vs client timezone beda.<br />
+<strong>Fix:</strong> Pindah ke komponen client untuk dynamic dates.</p>
+<h3>21. API Response Shape Tidak Konsisten</h3>
+<ul>
+<li><code>order-lead/route.ts</code> — return <code>{ error: string }</code> </li>
+<li><code>product-actions.ts</code> — return <code>ActionResult = { ok: true } | { ok: false; error: string }</code></li>
+<li><code>bootstrap/action/route.ts</code> — return <code>{ ok: true, email }</code>
+<strong>Fix:</strong> Standarisasi jadi satu format: <code>{ success: boolean, data?: T, error?: string }</code>.</li>
+</ul>
+<h3>22. Stale-While-Revalidate di Custom Landing Page</h3>
+<p><strong>File:</strong> <code>lp/[slug]/route.ts</code> line 115  </p>
+<div class="codehilite"><pre><span></span><code><span class="s2">&quot;Cache-Control&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;public, s-maxage=60, stale-while-revalidate=300&quot;</span>
+</code></pre></div>
+
+<p>Good! Tapi perlu dipastikan CDN (Coolify/Caddy) respect header ini.</p>
+<h3>23. Image Optimization</h3>
+<ul>
+<li>Tambah <code>priority</code> prop di <code>next/image</code> untuk above-the-fold images</li>
+<li>Gunakan <code>sizes</code> prop untuk responsive images</li>
+<li>Pastikan alt text di semua <code>&lt;Image&gt;</code> (banyak yang null/missing)</li>
+</ul>
+<h3>24. Rate Limit for Failed Login Attempts</h3>
+<p><strong>File:</strong> <code>admin/login/action/route.ts</code> — tambah delay progresif atau lockout.</p>
+<h3>25. No Type Check di Build</h3>
+<p><strong>File:</strong> <code>package.json</code> — script <code>typecheck</code> ada tapi tidak otomatis jalan.<br />
+<strong>Fix:</strong> Tambah <code>"prebuild": "tsc --noEmit"</code> atau integrasi ke CI.</p>
+<hr />
+<h2>🟢 LOW — Nice to Have / Tech Debt</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Issue</th>
+<th>File</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>26</td>
+<td>No Dockerfile</td>
+<td>—</td>
+<td>Untuk Coolify, perlu <code>Dockerfile</code> + <code>.dockerignore</code></td>
+</tr>
+<tr>
+<td>27</td>
+<td>No healthcheck endpoint</td>
+<td>—</td>
+<td>Tambah <code>GET /api/health</code> untuk monitoring Coolify</td>
+</tr>
+<tr>
+<td>28</td>
+<td><code>@splinetool/react-spline</code> unused</td>
+<td>package.json</td>
+<td>Heavy dep, cek apakah dipake</td>
+</tr>
+<tr>
+<td>29</td>
+<td><code>xlsx</code> heavy for export</td>
+<td>package.json</td>
+<td>1.3MB — bisa ganti pakai <code>exceljs</code> ringan atau CSV</td>
+</tr>
+<tr>
+<td>30</td>
+<td>No automated tests</td>
+<td>—</td>
+<td>Vitest/Playwright 0 setup</td>
+</tr>
+<tr>
+<td>31</td>
+<td>No CI pipeline</td>
+<td>—</td>
+<td>GitHub Actions untuk lint + typecheck + build</td>
+</tr>
+<tr>
+<td>32</td>
+<td><code>.env.example</code> outdated</td>
+<td>—</td>
+<td>Cek apakah semua env key ada dokumentasinya</td>
+</tr>
+<tr>
+<td>33</td>
+<td>Superadmin dashboard O(N) queries</td>
+<td>saas-actions.ts</td>
+<td><code>forEach</code> subscriptions, products — scale issue</td>
+</tr>
+<tr>
+<td>34</td>
+<td>Gap: No email/notif integration</td>
+<td>—</td>
+<td>Order lead masuk → owner gak dapat notif</td>
+</tr>
+<tr>
+<td>35</td>
+<td>Gap: No export CSV per kategori</td>
+<td>—</td>
+<td>Only full export via xlsx</td>
+</tr>
+<tr>
+<td>36</td>
+<td>Gap: No webhook for order_leads</td>
+<td>api/order-lead/route.ts</td>
+<td></td>
+</tr>
+<tr>
+<td>37</td>
+<td><code>next.config.ts</code> no <code>output: "standalone"</code></td>
+<td>—</td>
+<td>Untuk Docker, perlu standalone output</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>🔧 Pre-Deployment Action Items (By Priority)</h2>
+<h3>Week 1 — CRITICAL (HARUS)</h3>
+<ul>
+<li><span class="unchecked">☐</span> Fix redirect <code>/login</code> → <code>/admin/login</code> di auth.ts</li>
+<li><span class="unchecked">☐</span> Tambah security headers di next.config.ts</li>
+<li><span class="unchecked">☐</span> Ganti superadmin check (hapus fallback <code>is_admin</code>)</li>
+<li><span class="unchecked">☐</span> Hardened bootstrap endpoint (CSRF + rate limit)</li>
+<li><span class="unchecked">☐</span> Hapus hardcoded bank accounts fallback</li>
+<li><span class="unchecked">☐</span> Set <code>NEXT_PUBLIC_ADMIN_WA</code> env variable (hapus fallback hardcoded)</li>
+</ul>
+<h3>Week 2 — HIGH</h3>
+<ul>
+<li><span class="unchecked">☐</span> Rate limiting middleware untuk semua API</li>
+<li><span class="unchecked">☐</span> Login brute force protection (5 attempts lockout)</li>
+<li><span class="unchecked">☐</span> Hapus console.log statements</li>
+<li><span class="unchecked">☐</span> Fix N+1 query di fetchProducts</li>
+<li><span class="unchecked">☐</span> Subscription check juga di UPDATE</li>
+<li><span class="unchecked">☐</span> ISR/Revalidation untuk public pages</li>
+<li><span class="unchecked">☐</span> Fix 404 page</li>
+<li><span class="unchecked">☐</span> Integrasi Sentry error tracking</li>
+</ul>
+<h3>Week 3 — MEDIUM</h3>
+<ul>
+<li><span class="unchecked">☐</span> SEO: Open Graph + Twitter Cards + sitemap.xml</li>
+<li><span class="unchecked">☐</span> RLS policies untuk Supabase Storage</li>
+<li><span class="unchecked">☐</span> Pagination di order leads</li>
+<li><span class="unchecked">☐</span> Standarisasi API response shape</li>
+<li><span class="unchecked">☐</span> Fix hydration mismatch (date)</li>
+<li><span class="unchecked">☐</span> Image optimization (priority, sizes, alt)</li>
+</ul>
+<h3>Before Go-Live Final Check</h3>
+<ul>
+<li><span class="unchecked">☐</span> <code>npm run build</code> sukses tanpa error</li>
+<li><span class="unchecked">☐</span> <code>npm run lint</code> clean</li>
+<li><span class="unchecked">☐</span> <code>tsc --noEmit</code> no type errors</li>
+<li><span class="unchecked">☐</span> Security headers verified dengan curl</li>
+<li><span class="unchecked">☐</span> Rate limiting tested with 100 rapid requests</li>
+<li><span class="unchecked">☐</span> All env variables documented &amp; set</li>
+<li><span class="unchecked">☐</span> Database backup configured</li>
+<li><span class="unchecked">☐</span> SSL certificate aktif via Coolify</li>
+</ul>
+<hr />
+<h2>📊 Detailed Findings by Layer</h2>
+<h3>Security (6/10)</h3>
+<div class="codehilite"><pre><span></span><code>✅<span class="w"> </span><span class="nv">Zod</span><span class="w"> </span><span class="nv">validation</span><span class="w"> </span><span class="nv">on</span><span class="w"> </span><span class="nv">all</span><span class="w"> </span><span class="nv">user</span><span class="w"> </span><span class="nv">inputs</span>
+✅<span class="w"> </span><span class="nv">Supabase</span><span class="w"> </span><span class="nv">SSR</span><span class="w"> </span><span class="nv">session</span><span class="w"> </span><span class="nv">handling</span>
+✅<span class="w"> </span><span class="nv">requireAdmin</span><span class="o">/</span><span class="nv">requireSuperAdmin</span><span class="w"> </span><span class="nv">guard</span>
+✅<span class="w"> </span><span class="nv">CSRF</span><span class="w"> </span><span class="nv">via</span><span class="w"> </span><span class="k">Next</span>.<span class="nv">js</span><span class="w"> </span><span class="nv">Server</span><span class="w"> </span><span class="nv">Actions</span><span class="w"> </span><span class="ss">(</span><span class="nv">built</span><span class="o">-</span><span class="nv">in</span><span class="ss">)</span>
+❌<span class="w"> </span><span class="nv">Service</span><span class="o">-</span><span class="nv">role</span><span class="w"> </span><span class="nv">key</span><span class="w"> </span><span class="nv">everywhere</span><span class="w"> </span><span class="ss">(</span><span class="nv">no</span><span class="w"> </span><span class="nv">RLS</span><span class="ss">)</span>
+❌<span class="w"> </span><span class="nv">No</span><span class="w"> </span><span class="nv">rate</span><span class="w"> </span><span class="nv">limiting</span><span class="w"> </span><span class="nv">on</span><span class="w"> </span><span class="nv">any</span><span class="w"> </span><span class="nv">endpoint</span>
+❌<span class="w"> </span><span class="nv">No</span><span class="w"> </span><span class="nv">CSP</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nv">security</span><span class="w"> </span><span class="nv">headers</span>
+❌<span class="w"> </span><span class="nv">XSS</span><span class="w"> </span><span class="nv">vector</span><span class="w"> </span><span class="nv">on</span><span class="w"> </span><span class="nv">custom</span><span class="w"> </span><span class="nv">landing</span><span class="w"> </span><span class="nv">pages</span>
+❌<span class="w"> </span><span class="nv">Brute</span><span class="w"> </span><span class="nv">force</span><span class="w"> </span><span class="nv">protection</span><span class="w"> </span><span class="nv">missing</span>
+❌<span class="w"> </span><span class="nv">Superadmin</span><span class="w"> </span><span class="nv">auth</span><span class="w"> </span><span class="nv">check</span><span class="w"> </span><span class="nv">too</span><span class="w"> </span><span class="nv">loose</span>
+</code></pre></div>
+
+<h3>Data Layer (8/10)</h3>
+<div class="codehilite"><pre><span></span><code><span class="err">✅</span><span class="w"> </span><span class="n">Zod</span><span class="w"> </span><span class="n">schemas</span><span class="p">:</span><span class="w"> </span><span class="n">product</span><span class="p">,</span><span class="w"> </span><span class="n">category</span><span class="p">,</span><span class="w"> </span><span class="n">site_settings</span>
+<span class="err">✅</span><span class="w"> </span><span class="n">Slug</span><span class="w"> </span><span class="n">uniqueness</span><span class="w"> </span><span class="n">validation</span>
+<span class="err">✅</span><span class="w"> </span><span class="n">Gallery</span><span class="w"> </span><span class="n">JSON</span><span class="w"> </span><span class="n">normalization</span><span class="w"> </span><span class="p">(</span><span class="n">parseGalleryField</span><span class="p">)</span>
+<span class="err">✅</span><span class="w"> </span><span class="n">Storage</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="n">sanitization</span><span class="w"> </span><span class="p">(</span><span class="n">safeName</span><span class="w"> </span><span class="n">regex</span><span class="p">)</span>
+<span class="err">✅</span><span class="w"> </span><span class="n">File</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="n">validation</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">upload</span>
+<span class="err">❌</span><span class="w"> </span><span class="n">N</span><span class="o">+</span><span class="mi">1</span><span class="w"> </span><span class="n">queries</span><span class="w"> </span><span class="p">(</span><span class="n">fetchProducts</span><span class="p">,</span><span class="w"> </span><span class="n">getVisibleCategories</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">count</span><span class="p">)</span>
+<span class="err">❌</span><span class="w"> </span><span class="n">Subscription</span><span class="w"> </span><span class="n">check</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">INSERT</span><span class="w"> </span><span class="n">only</span>
+<span class="err">❌</span><span class="w"> </span><span class="n">No</span><span class="w"> </span><span class="n">pagination</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">order_leads</span>
+</code></pre></div>
+
+<h3>Performance (5/10)</h3>
+<div class="codehilite"><pre><span></span><code>❌<span class="w"> </span><span class="nv">force</span><span class="o">-</span><span class="nv">dynamic</span><span class="w"> </span><span class="nv">on</span><span class="w"> </span><span class="nv">all</span><span class="w"> </span><span class="nv">public</span><span class="w"> </span><span class="nv">pages</span><span class="w"> </span><span class="ss">(</span><span class="nv">no</span><span class="w"> </span><span class="nv">cache</span><span class="ss">)</span>
+❌<span class="w"> </span><span class="nv">N</span><span class="o">+</span><span class="mi">1</span><span class="w"> </span><span class="nv">query</span><span class="w"> </span><span class="nv">pattern</span><span class="w"> </span><span class="nv">widespread</span>
+❌<span class="w"> </span><span class="nv">No</span><span class="w"> </span><span class="nv">ISR</span><span class="o">/</span><span class="nv">revalidate</span><span class="w"> </span><span class="nv">strategy</span>
+✅<span class="w"> </span><span class="nv">Server</span><span class="w"> </span><span class="nv">Components</span><span class="w"> </span><span class="ss">(</span><span class="nv">minimal</span><span class="w"> </span><span class="nv">JS</span><span class="w"> </span><span class="nv">client</span><span class="o">-</span><span class="nv">side</span><span class="ss">)</span>
+✅<span class="w"> </span><span class="nv">Image</span><span class="w"> </span><span class="nv">optimization</span><span class="w"> </span><span class="nv">via</span><span class="w"> </span><span class="k">next</span><span class="o">/</span><span class="nv">image</span><span class="w"> </span><span class="ss">(</span><span class="nv">partial</span><span class="ss">)</span>
+</code></pre></div>
+
+<h3>UX &amp; Storefront (8/10)</h3>
+<div class="codehilite"><pre><span></span><code>✅ Touch-friendly buttons (h-14 on mobile)
+✅ Responsive grid (2-6 columns)
+✅ Breadcrumbs everywhere
+✅ Loading states (skeleton/empty-state)
+✅ WA CTA flow tested
+❌ Line-clamp-1 issues (known from promo)
+❌ Missing alt text on some images
+❌ Social links placeholder
+</code></pre></div>
+
+<hr />
+<h2>🚀 Coolify Deployment Notes</h2>
+<ol>
+<li><strong>Build Command:</strong> <code>npm run build</code> (butuh Node 20+)</li>
+<li><strong>Start Command:</strong> <code>npm start</code> atau <code>node .next/standalone/server.js</code></li>
+<li><strong>Environment</strong>: Semua <code>NEXT_PUBLIC_*</code> + <code>SUPABASE_SERVICE_ROLE</code> + <code>SUPABASE_URL</code></li>
+<li><strong>Dockerfile:</strong> Perlu <code>Dockerfile</code> dengan multi-stage build:
+   ```dockerfile
+   FROM node:20-alpine AS builder
+   WORKDIR /app
+   COPY package*.json ./
+   RUN npm ci
+   COPY . .
+   RUN npm run build</li>
+</ol>
+<p>FROM node:20-alpine AS runner
+   WORKDIR /app
+   COPY --from=builder /app/.next/standalone ./
+   COPY --from=builder /app/public ./public
+   EXPOSE 3000
+   CMD ["node", "server.js"]
+   <code>``
+5. **Set</code>next.config.ts<code>:** tambah</code>output: "standalone"`</p>
+<hr />
+<h2>📝 Cara Verifikasi Checklist</h2>
+<div class="codehilite"><pre><span></span><code><span class="c1"># 1. Build test</span>
+npm<span class="w"> </span>run<span class="w"> </span>build
+
+<span class="c1"># 2. Lint</span>
+npm<span class="w"> </span>run<span class="w"> </span>lint
+
+<span class="c1"># 3. Type check</span>
+npx<span class="w"> </span>tsc<span class="w"> </span>--noEmit
+
+<span class="c1"># 4. Security headers test</span>
+curl<span class="w"> </span>-s<span class="w"> </span>-I<span class="w"> </span>https://yourdomain.com<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-i<span class="w"> </span><span class="s2">&quot;X-Frame\|X-Content\|Strict-Transport&quot;</span>
+
+<span class="c1"># 5. Rate limit test</span>
+<span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="k">$(</span>seq<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">20</span><span class="k">)</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>curl<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-w<span class="w"> </span><span class="s2">&quot;%{http_code}\n&quot;</span><span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://yourdomain.com/api/order-lead<span class="p">;</span><span class="w"> </span><span class="k">done</span>
+
+<span class="c1"># 6. RLS check (via Supabase dashboard SQL editor)</span>
+SELECT<span class="w"> </span>*<span class="w"> </span>FROM<span class="w"> </span>pg_policies<span class="w"> </span>WHERE<span class="w"> </span><span class="nv">tablename</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;products&#39;</span><span class="p">;</span>
+</code></pre></div>
+
+<hr />
+<blockquote>
+<p><strong>Last Updated:</strong> 2026-07-30<br />
+<strong>Auditor:</strong> Hermes AI (Arul IT Profile)<br />
+<strong>Status:</strong> 🟡 Production-ready dengan catatan — critical blocker harus fix dulu sebelum指向 actual domain</p>
+</blockquote>
+
+<hr>
+<p style="text-align:center; color:#94a3b8; font-size:7pt; margin-top:20px;">
+  <strong>KatalogHub</strong> — Pre-Deployment Checklist &bull; Generated 30 Juli 2026<br>
+  <em>Dokumen ini adalah hasil audit codebase otomatis. Verifikasi manual tetap diperlukan untuk keputusan production.</em>
+</p>
+
+</body>
+</html>

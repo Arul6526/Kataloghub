@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "grill-me": {
+      "path": ".agents/skills/grill-me/agents/openai.yaml"
+    }
+  },
+  "mcp": {
+    "21st": {
+      "type": "remote",
+      "url": "https://21st.dev/api/mcp",
+      "headers": {
+        "x-api-key": "21st_sk_262b081cab10c3ef7c0bfd7756fb9f0b2ec2382c3420565360de2114224f3a19"
+      }
+    }
+  }
+}

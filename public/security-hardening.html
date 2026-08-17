@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>KatalogHub — Security Hardening Plan</title>
+<style>
+@page { size: A4; margin: 18mm 16mm 22mm 16mm; }
+@media print { body { font-size: 8.5pt; } pre { page-break-inside: avoid; } h2,h3 { page-break-after: avoid; } table { page-break-inside: avoid; } }
+* { box-sizing: border-box; }
+body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 9pt; line-height: 1.55; color: #1e293b; max-width: 210mm; margin: 0 auto; padding: 0 10px; }
+.title-block { text-align: center; padding: 24px 0 16px 0; border-bottom: 3px solid #dc2626; margin-bottom: 20px; }
+.title-block h1 { font-size: 20pt; color: #111827; margin: 0 0 6px 0; }
+.title-block .subtitle { font-size: 10pt; color: #dc2626; font-weight: 600; margin: 0; }
+h1 { font-size: 14pt; color: #111827; border-bottom: 3px solid #ef4444; padding-bottom: 5px; margin: 22px 0 10px 0; }
+h2 { font-size: 12pt; color: #dc2626; border-bottom: 1.5px solid #fca5a5; padding-bottom: 3px; margin: 18px 0 8px 0; }
+h3 { font-size: 10pt; color: #1e293b; margin: 14px 0 6px 0; }
+code { font-family: 'Consolas','Courier New',monospace; font-size: 7.5pt; background: #f1f5f9; padding: 1px 4px; border-radius: 3px; }
+pre { background: #0f172a; color: #e2e8f0; padding: 8px 10px; border-radius: 5px; font-size: 7pt; line-height: 1.4; overflow-x: auto; }
+pre code { background: none; padding: 0; color: inherit; }
+table { border-collapse: collapse; width: 100%; font-size: 8pt; margin: 6px 0 12px 0; border: 1px solid #e2e8f0; }
+th { background: #fef2f2; text-align: left; padding: 4px 7px; border: 1px solid #fecaca; font-weight: 700; color: #991b1b; }
+td { padding: 3px 7px; border: 1px solid #e2e8f0; vertical-align: top; }
+tr:nth-child(even) td { background: #fafafa; }
+ul,ol { padding-left: 18px; margin: 3px 0 6px 0; }
+li { margin: 1px 0; }
+p { margin: 3px 0 6px 0; }
+strong { color: #0f172a; }
+blockquote { border-left: 4px solid #ef4444; padding: 4px 10px; margin: 8px 0; background: #fef2f2; color: #991b1b; border-radius: 0 5px 5px 0; font-size: 8.5pt; }
+hr { border: none; border-top: 2px solid #fecaca; margin: 16px 0; }
+.severity-critical { color: #dc2626; font-weight: 700; }
+.severity-high { color: #ea580c; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="title-block">
+  <h1>🛡️ KatalogHub — Security Hardening Plan</h1>
+  <p class="subtitle">Dari 3.5/10 → Target 10/10</p>
+</div>
+<h1>🛡️ KatalogHub — Security Hardening Plan</h1>
+<blockquote>
+<p><strong>Goal:</strong> Menaikkan security score dari <strong>6/10 → 10/10</strong><br />
+<strong>Audit Date:</strong> 30 Juli 2026<br />
+<strong>Total attack surface items:</strong> 37<br />
+<strong>Coverage:</strong> Auth, API, Database, Storage, XSS, Rate Limiting, Infrastructure, Monitoring</p>
+</blockquote>
+<hr />
+<h2>📊 Security Posture Matrix</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Current</th>
+<th>Target</th>
+<th>Risiko jika tidak di-fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authentication</strong></td>
+<td>🟡 6/10</td>
+<td>🔵 10/10</td>
+<td>Brute force admin login, session hijack</td>
+</tr>
+<tr>
+<td><strong>API Security</strong></td>
+<td>🔴 4/10</td>
+<td>🔵 10/10</td>
+<td>Spam order leads, abuse tracking, data polling</td>
+</tr>
+<tr>
+<td><strong>Database/RLS</strong></td>
+<td>🔴 3/10</td>
+<td>🔵 10/10</td>
+<td>Data leakage antar tenant via service role</td>
+</tr>
+<tr>
+<td><strong>XSS Prevention</strong></td>
+<td>🟡 6/10</td>
+<td>🔵 10/10</td>
+<td>Store owner bisa inject JS di landing page</td>
+</tr>
+<tr>
+<td><strong>Infrastructure</strong></td>
+<td>🔴 2/10</td>
+<td>🔵 10/10</td>
+<td>Clickjacking, MIME sniffing, CSP bypass</td>
+</tr>
+<tr>
+<td><strong>Rate Limiting</strong></td>
+<td>🔴 0/10</td>
+<td>🔵 9/10</td>
+<td>DDoS API endpoints, brute force</td>
+</tr>
+<tr>
+<td><strong>Monitoring</strong></td>
+<td>🔴 1/10</td>
+<td>🔵 9/10</td>
+<td>Blind to attacks, no audit trail</td>
+</tr>
+<tr>
+<td><strong>Data Privacy</strong></td>
+<td>🟡 5/10</td>
+<td>🔵 9/10</td>
+<td>Hardcoded bank accounts, no PII sanitization</td>
+</tr>
+<tr>
+<td><strong>Storage Security</strong></td>
+<td>🟡 5/10</td>
+<td>🔵 9/10</td>
+<td>Public bucket tanpa RLS proper</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>🔴 3.5/10</strong></td>
+<td><strong>🔵 9.5/10</strong></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>📋 Task Breakdown</h2>
+<h3>🔴 PHASE 1 — Critical (Harus sebelum domain publik)</h3>
+<h4>T1. Fix Auth Redirect &amp; Guard</h4>
+<p><strong>Files:</strong> <code>src/lib/auth.ts</code>, <code>src/middleware.ts</code></p>
+<p><strong>Masalah:</strong>
+- <code>redirect("/login")</code> → 404, seharusnya <code>/admin/login</code>
+- Superadmin guard terlalu longgar (<code>is_admin</code> juga bisa akses)</p>
+<p><strong>Fix:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// auth.ts — fix redirect</span>
+<span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">requireAdmin</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">getCurrentUser</span><span class="p">();</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">current</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">redirect</span><span class="p">(</span><span class="s2">&quot;/admin/login&quot;</span><span class="p">);</span><span class="w"> </span><span class="c1">// FIXED: was &quot;/login&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">current</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// auth.ts — tight superadmin check</span>
+<span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">requireSuperAdmin</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">getCurrentUser</span><span class="p">();</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">current</span><span class="p">)</span><span class="w"> </span><span class="nx">redirect</span><span class="p">(</span><span class="s2">&quot;/admin/login?redirect=/superadmin&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// Hanya role explicit &quot;superadmin&quot;</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">current</span><span class="p">.</span><span class="nx">profile</span><span class="p">.</span><span class="nx">role</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s2">&quot;superadmin&quot;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">redirect</span><span class="p">(</span><span class="s2">&quot;/admin?error=superadmin-required&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">current</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 15 menit<br />
+<strong>Risk if skipped:</strong> 🔴 404 on session expiry, privilege escalation</p>
+<hr />
+<h4>T2. Security Headers + CSP</h4>
+<p><strong>File:</strong> <code>next.config.ts</code></p>
+<p><strong>Masalah:</strong> Zero security headers, vulnerable to clickjacking, XSS, MIME sniffing.</p>
+<p><strong>Fix:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">nextConfig</span><span class="o">:</span><span class="w"> </span><span class="kt">NextConfig</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// ...existing config</span>
+<span class="w">  </span><span class="k">async</span><span class="w"> </span><span class="nx">headers</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">source</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;/(.*)&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span><span class="w"> </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;X-Frame-Options&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;DENY&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="w"> </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;X-Content-Type-Options&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;nosniff&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="w"> </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Referrer-Policy&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;strict-origin-when-cross-origin&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Strict-Transport-Security&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;max-age=63072000; includeSubDomains; preload&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Content-Security-Policy&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="s2">&quot;default-src &#39;self&#39;&quot;</span><span class="p">,</span>
+<span class="w">              </span><span class="s2">&quot;script-src &#39;self&#39; &#39;unsafe-eval&#39; &#39;unsafe-inline&#39;&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// Next.js needs inline</span>
+<span class="w">              </span><span class="s2">&quot;style-src &#39;self&#39; &#39;unsafe-inline&#39;&quot;</span><span class="p">,</span>
+<span class="w">              </span><span class="s2">&quot;img-src &#39;self&#39; data: blob: https://*.supabase.co https:&quot;</span><span class="p">,</span>
+<span class="w">              </span><span class="s2">&quot;font-src &#39;self&#39; data:&quot;</span><span class="p">,</span>
+<span class="w">              </span><span class="s2">&quot;connect-src &#39;self&#39; https://*.supabase.co https://api.unsplash.com&quot;</span><span class="p">,</span>
+<span class="w">              </span><span class="s2">&quot;frame-ancestors &#39;none&#39;&quot;</span><span class="p">,</span>
+<span class="w">              </span><span class="s2">&quot;base-uri &#39;none&#39;&quot;</span><span class="p">,</span>
+<span class="w">              </span><span class="s2">&quot;form-action &#39;self&#39;&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="p">].</span><span class="nx">join</span><span class="p">(</span><span class="s2">&quot;; &quot;</span><span class="p">),</span>
+<span class="w">          </span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="w"> </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Permissions-Policy&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;camera=(), microphone=(), geolocation=()&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">    </span><span class="p">];</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 30 menit<br />
+<strong>Risk if skipped:</strong> 🔴 Clickjacking, XSS vector via HTML injection</p>
+<hr />
+<h4>T3. Rate Limiting Middleware</h4>
+<p><strong>Files:</strong> <code>src/lib/rate-limit.ts</code> (baru), <code>src/middleware.ts</code> (update)</p>
+<p><strong>Masalah:</strong> Bruteforce login, spam order leads, abuse tracking — tidak ada proteksi sama sekali.</p>
+<p><strong>Implementation — In-Memory Rate Limiter:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// src/lib/rate-limit.ts</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">rateMap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Map</span><span class="o">&lt;</span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">count</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="p">;</span><span class="w"> </span><span class="nx">resetAt</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="w"> </span><span class="p">}</span><span class="o">&gt;</span><span class="p">();</span>
+
+<span class="k">export</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">rateLimit</span><span class="p">(</span>
+<span class="w">  </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">maxAttempts</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">10</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">windowMs</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">60</span><span class="nx">_000</span>
+<span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">allowed</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span><span class="w"> </span><span class="nx">remaining</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">now</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">entry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">rateMap</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">key</span><span class="p">);</span>
+
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">entry</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nx">now</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="nx">entry</span><span class="p">.</span><span class="nx">resetAt</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">rateMap</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="nx">key</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">count</span><span class="o">:</span><span class="w"> </span><span class="kt">1</span><span class="p">,</span><span class="w"> </span><span class="nx">resetAt</span><span class="o">:</span><span class="w"> </span><span class="kt">now</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nx">windowMs</span><span class="w"> </span><span class="p">});</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">allowed</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="p">,</span><span class="w"> </span><span class="nx">remaining</span><span class="o">:</span><span class="w"> </span><span class="kt">maxAttempts</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">1</span><span class="w"> </span><span class="p">};</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">entry</span><span class="p">.</span><span class="nx">count</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="nx">maxAttempts</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">allowed</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="p">,</span><span class="w"> </span><span class="nx">remaining</span><span class="o">:</span><span class="w"> </span><span class="kt">0</span><span class="w"> </span><span class="p">};</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nx">entry</span><span class="p">.</span><span class="nx">count</span><span class="o">++</span><span class="p">;</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">allowed</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="p">,</span><span class="w"> </span><span class="nx">remaining</span><span class="o">:</span><span class="w"> </span><span class="kt">maxAttempts</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nx">entry</span><span class="p">.</span><span class="nx">count</span><span class="w"> </span><span class="p">};</span>
+<span class="p">}</span>
+
+<span class="c1">// Periodic cleanup (every 5 menit)</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="ow">typeof</span><span class="w"> </span><span class="nx">setInterval</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s2">&quot;undefined&quot;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">setInterval</span><span class="p">(()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">now</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">();</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">key</span><span class="p">,</span><span class="w"> </span><span class="nx">entry</span><span class="p">]</span><span class="w"> </span><span class="k">of</span><span class="w"> </span><span class="nx">rateMap</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">now</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="nx">entry</span><span class="p">.</span><span class="nx">resetAt</span><span class="p">)</span><span class="w"> </span><span class="nx">rateMap</span><span class="p">.</span><span class="ow">delete</span><span class="p">(</span><span class="nx">key</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">},</span><span class="w"> </span><span class="mf">300</span><span class="nx">_000</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Middleware integration:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// src/middleware.ts — tambah rate limit</span>
+<span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">middleware</span><span class="p">(</span><span class="nx">request</span><span class="o">:</span><span class="w"> </span><span class="kt">NextRequest</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">request</span><span class="p">.</span><span class="nx">headers</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s2">&quot;x-forwarded-for&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="nx">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)[</span><span class="mf">0</span><span class="p">]</span><span class="o">?</span><span class="p">.</span><span class="nx">trim</span><span class="p">()</span>
+<span class="w">    </span><span class="o">||</span><span class="w"> </span><span class="nx">request</span><span class="p">.</span><span class="nx">headers</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s2">&quot;x-real-ip&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="o">||</span><span class="w"> </span><span class="s2">&quot;unknown&quot;</span><span class="p">;</span>
+
+<span class="w">  </span><span class="c1">// Rate limit API endpoints (20 req/min per IP)</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">request</span><span class="p">.</span><span class="nx">nextUrl</span><span class="p">.</span><span class="nx">pathname</span><span class="p">.</span><span class="nx">startsWith</span><span class="p">(</span><span class="s2">&quot;/api/&quot;</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">allowed</span><span class="p">,</span><span class="w"> </span><span class="nx">remaining</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">rateLimit</span><span class="p">(</span><span class="sb">`api:</span><span class="si">${</span><span class="nx">ip</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="mf">20</span><span class="p">,</span><span class="w"> </span><span class="mf">60</span><span class="nx">_000</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">allowed</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">(</span><span class="nb">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">({</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Too many requests&quot;</span><span class="w"> </span><span class="p">}),</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">429</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="s2">&quot;Retry-After&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;60&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="s2">&quot;X-RateLimit-Remaining&quot;</span><span class="o">:</span><span class="w"> </span><span class="nb">String</span><span class="p">(</span><span class="nx">remaining</span><span class="p">),</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">      </span><span class="p">});</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// Rate limit login (5 attempts per 15 menit per IP)</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">request</span><span class="p">.</span><span class="nx">nextUrl</span><span class="p">.</span><span class="nx">pathname</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;/admin/login/action&quot;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">allowed</span><span class="p">,</span><span class="w"> </span><span class="nx">remaining</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">rateLimit</span><span class="p">(</span><span class="sb">`login:</span><span class="si">${</span><span class="nx">ip</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="mf">5</span><span class="p">,</span><span class="w"> </span><span class="mf">900</span><span class="nx">_000</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">allowed</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">(</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Terlalu banyak percobaan login. Coba lagi dalam 15 menit.&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">429</span><span class="w"> </span><span class="p">}</span>
+<span class="w">      </span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">updateSession</span><span class="p">(</span><span class="nx">request</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 1 jam<br />
+<strong>Risk if skipped:</strong> 🔴 Brute force unlimited, API abuse</p>
+<hr />
+<h4>T4. Input Validation untuk Order Lead API</h4>
+<p><strong>File:</strong> <code>src/app/api/order-lead/route.ts</code></p>
+<p><strong>Masalah:</strong> No validation, anyone can POST any data. Tidak ada rate limiting, tidak ada sanitasi.</p>
+<p><strong>Fix:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">z</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;zod&quot;</span><span class="p">;</span>
+
+<span class="kd">const</span><span class="w"> </span><span class="nx">orderLeadSchema</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">z</span><span class="p">.</span><span class="nx">object</span><span class="p">({</span>
+<span class="w">  </span><span class="nx">storeSlug</span><span class="o">:</span><span class="w"> </span><span class="kt">z.string</span><span class="p">().</span><span class="nx">min</span><span class="p">(</span><span class="mf">1</span><span class="p">).</span><span class="nx">max</span><span class="p">(</span><span class="mf">60</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">regex</span><span class="p">(</span><span class="sr">/^[a-z0-9-]+$/</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Invalid store slug&quot;</span><span class="p">),</span>
+<span class="w">  </span><span class="nx">itemsSummary</span><span class="o">:</span><span class="w"> </span><span class="kt">z.string</span><span class="p">().</span><span class="nx">min</span><span class="p">(</span><span class="mf">1</span><span class="p">).</span><span class="nx">max</span><span class="p">(</span><span class="mf">2000</span><span class="p">),</span>
+<span class="w">  </span><span class="nx">totalPrice</span><span class="o">:</span><span class="w"> </span><span class="kt">z.number</span><span class="p">().</span><span class="nx">nonnegative</span><span class="p">().</span><span class="nx">max</span><span class="p">(</span><span class="mf">999</span><span class="nx">_999_999</span><span class="p">).</span><span class="nx">optional</span><span class="p">().</span><span class="k">default</span><span class="p">(</span><span class="mf">0</span><span class="p">),</span>
+<span class="w">  </span><span class="nx">customerName</span><span class="o">:</span><span class="w"> </span><span class="kt">z.string</span><span class="p">().</span><span class="nx">max</span><span class="p">(</span><span class="mf">120</span><span class="p">).</span><span class="nx">optional</span><span class="p">(),</span>
+<span class="p">});</span>
+
+<span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">POST</span><span class="p">(</span><span class="nx">req</span><span class="o">:</span><span class="w"> </span><span class="kt">NextRequest</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Rate limit check</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">req</span><span class="p">.</span><span class="nx">headers</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s2">&quot;x-forwarded-for&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="nx">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)[</span><span class="mf">0</span><span class="p">]</span><span class="o">?</span><span class="p">.</span><span class="nx">trim</span><span class="p">()</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s2">&quot;unknown&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">allowed</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">rateLimit</span><span class="p">(</span><span class="sb">`order-lead:</span><span class="si">${</span><span class="nx">ip</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="mf">10</span><span class="p">,</span><span class="w"> </span><span class="mf">60</span><span class="nx">_000</span><span class="p">);</span><span class="w"> </span><span class="c1">// 10 per minute</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">allowed</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">({</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Too many orders&quot;</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">429</span><span class="w"> </span><span class="p">});</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">req</span><span class="p">.</span><span class="nx">json</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">parsed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">orderLeadSchema</span><span class="p">.</span><span class="nx">safeParse</span><span class="p">(</span><span class="nx">body</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">parsed</span><span class="p">.</span><span class="nx">success</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">(</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Data tidak valid&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">details</span><span class="o">:</span><span class="w"> </span><span class="kt">parsed.error.flatten</span><span class="p">()</span><span class="w"> </span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">400</span><span class="w"> </span><span class="p">}</span>
+<span class="w">      </span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">storeSlug</span><span class="p">,</span><span class="w"> </span><span class="nx">itemsSummary</span><span class="p">,</span><span class="w"> </span><span class="nx">totalPrice</span><span class="p">,</span><span class="w"> </span><span class="nx">customerName</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">parsed</span><span class="p">.</span><span class="nx">data</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Verify store slug exists</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">createAdminClient</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="kt">settings</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;site_settings&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;user_id&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">eq</span><span class="p">(</span><span class="s2">&quot;store_slug&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">storeSlug</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">maybeSingle</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">settings</span><span class="o">?</span><span class="p">.</span><span class="nx">user_id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">({</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Toko tidak ditemukan&quot;</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">404</span><span class="w"> </span><span class="p">});</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// Sanitize input</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">sanitizedSummary</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">itemsSummary</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">replace</span><span class="p">(</span><span class="sr">/&lt;[^&gt;]*&gt;/g</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">)</span><span class="w">  </span><span class="c1">// Strip HTML tags</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">2000</span><span class="p">);</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">sanitizedName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="nx">customerName</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s2">&quot;Pelanggan Katalog&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">replace</span><span class="p">(</span><span class="sr">/&lt;[^&gt;]*&gt;/g</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">120</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;order_leads&quot;</span><span class="p">).</span><span class="nx">insert</span><span class="p">({</span>
+<span class="w">      </span><span class="nx">user_id</span><span class="o">:</span><span class="w"> </span><span class="kt">settings.user_id</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">store_slug</span><span class="o">:</span><span class="w"> </span><span class="kt">storeSlug</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">customer_name</span><span class="o">:</span><span class="w"> </span><span class="kt">sanitizedName</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">items_summary</span><span class="o">:</span><span class="w"> </span><span class="kt">sanitizedSummary</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">total_price</span><span class="o">:</span><span class="w"> </span><span class="kt">Math.max</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="nb">Math</span><span class="p">.</span><span class="nx">min</span><span class="p">(</span><span class="nx">totalPrice</span><span class="p">,</span><span class="w"> </span><span class="mf">999</span><span class="nx">_999_999</span><span class="p">)),</span>
+<span class="w">    </span><span class="p">});</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">({</span><span class="w"> </span><span class="nx">ok</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">});</span>
+<span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s2">&quot;[Order Lead API]&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">({</span><span class="w"> </span><span class="nx">ok</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">});</span><span class="w"> </span><span class="c1">// Tetap return ok biar WA flow gak broken</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 1 jam<br />
+<strong>Risk if skipped:</strong> 🟠 Database pollution, spam order leads</p>
+<hr />
+<h4>T5. XSS Prevention — Custom Landing Page</h4>
+<p><strong>File:</strong> <code>src/app/lp/[slug]/route.ts</code></p>
+<p><strong>Masalah:</strong> <code>page.html_source</code> dirender mentah. Store owner bisa inject script jahat. Jika ada XSS, pengunjung toko bisa dicuri cookie/session.</p>
+<p><strong>Fix — DOMPurify server-side:</strong></p>
+<div class="codehilite"><pre><span></span><code>npm<span class="w"> </span>install<span class="w"> </span>isomorphic-dompurify
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// src/lib/sanitize-html.ts</span>
+<span class="k">import</span><span class="w"> </span><span class="nx">DOMPurify</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;isomorphic-dompurify&quot;</span><span class="p">;</span>
+
+<span class="k">export</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">sanitizeHtml</span><span class="p">(</span><span class="nx">html</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">DOMPurify</span><span class="p">.</span><span class="nx">sanitize</span><span class="p">(</span><span class="nx">html</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">ALLOWED_TAGS</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="s2">&quot;h1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;h2&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;h3&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;h4&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;h5&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;h6&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s2">&quot;p&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;br&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;hr&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s2">&quot;ul&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;ol&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;li&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s2">&quot;table&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;thead&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;tbody&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;tr&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;th&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;td&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s2">&quot;div&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;span&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;section&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s2">&quot;a&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;img&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s2">&quot;strong&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;em&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;b&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;i&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;u&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;s&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s2">&quot;blockquote&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;pre&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;code&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s2">&quot;figure&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;figcaption&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nx">ALLOWED_ATTR</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;href&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;target&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;rel&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;src&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;alt&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;class&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;style&quot;</span><span class="p">],</span>
+<span class="w">    </span><span class="nx">ALLOW_DATA_ATTR</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">ALLOW_UNKNOWN_PROTOCOLS</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="p">,</span>
+<span class="w">  </span><span class="p">});</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// lp/[slug]/route.ts — di handler GET</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">page</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">fetchCustomLandingPageBySlug</span><span class="p">(</span><span class="nx">slug</span><span class="p">);</span>
+<span class="c1">// ... validasi</span>
+<span class="kd">let</span><span class="w"> </span><span class="nx">html</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="nx">html_source</span><span class="p">;</span>
+<span class="nx">html</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">sanitizeHtml</span><span class="p">(</span><span class="nx">html</span><span class="p">);</span><span class="w"> </span><span class="c1">// ← SANITIZE BEFORE RENDER!</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 1 jam<br />
+<strong>Risk if skipped:</strong> 🔴 Full XSS — bisa steal cookies, redirect ke phishing</p>
+<hr />
+<h4>T6. Hardcoded Secrets Removal</h4>
+<p><strong>Files:</strong> 
+- <code>src/lib/whatsapp.ts</code> — <code>PLATFORM_ADMIN_WA</code> fallback <code>628123456789</code>
+- <code>src/lib/actions/saas-actions.ts</code> — default bank accounts</p>
+<p><strong>Masalah:</strong> Nomor WA admin palsu dan rekening bank palsu hardcoded di source. Kalau env variable gak di-set, fallback ke data palsu.</p>
+<p><strong>Fix:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// whatsapp.ts — jangan pernah fallback ke hardcoded</span>
+<span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">PLATFORM_ADMIN_WA</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">wa</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">NEXT_PUBLIC_ADMIN_WA</span><span class="p">;</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">wa</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">!</span><span class="sr">/^\d{10,15}$/</span><span class="p">.</span><span class="nx">test</span><span class="p">(</span><span class="nx">wa</span><span class="p">.</span><span class="nx">replace</span><span class="p">(</span><span class="sr">/\D/g</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">)))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span><span class="w"> </span><span class="c1">// null lebih aman daripada nomor palsu</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">formatWhatsAppNumber</span><span class="p">(</span><span class="nx">wa</span><span class="p">);</span>
+<span class="p">})();</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// saas-actions.ts — default bank accounts → null instead of fake data</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">defaultAccounts</span><span class="o">:</span><span class="w"> </span><span class="kt">PlatformBankAccount</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[];</span><span class="w"> </span><span class="c1">// empty is safer</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">defaultInstructions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Silakan hubungi admin untuk informasi pembayaran.&quot;</span><span class="p">;</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 15 menit<br />
+<strong>Risk if skipped:</strong> 🟠 Pengunjung lihat data rekening palsu, WA ke nomor salah</p>
+<hr />
+<h4>T7. CSRF Protection untuk Bootstrap</h4>
+<p><strong>File:</strong> <code>src/app/admin/bootstrap/action/route.ts</code></p>
+<p><strong>Masalah:</strong> Endpoint tanpa CSRF token, tanpa rate limit. If <code>has_no_admin()</code> somehow returns true (bug RPC), bisa dibuat admin baru.</p>
+<p><strong>Fix:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// Generate dan validasi CSRF token untuk bootstrap</span>
+<span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">createHash</span><span class="p">,</span><span class="w"> </span><span class="nx">randomBytes</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;crypto&quot;</span><span class="p">;</span>
+
+<span class="kd">const</span><span class="w"> </span><span class="nx">BOOTSTRAP_TOKENS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Map</span><span class="o">&lt;</span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="kt">number</span><span class="o">&gt;</span><span class="p">();</span><span class="w"> </span><span class="c1">// token → expiry</span>
+
+<span class="k">export</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">generateBootstrapToken</span><span class="p">()</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">randomBytes</span><span class="p">(</span><span class="mf">32</span><span class="p">).</span><span class="nx">toString</span><span class="p">(</span><span class="s2">&quot;hex&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="nx">BOOTSTRAP_TOKENS</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="nx">token</span><span class="p">,</span><span class="w"> </span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">600</span><span class="nx">_000</span><span class="p">);</span><span class="w"> </span><span class="c1">// 10 menit valid</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">token</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">export</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">validateBootstrapToken</span><span class="p">(</span><span class="nx">token</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">expiry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">BOOTSTRAP_TOKENS</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">token</span><span class="p">);</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">expiry</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="nx">expiry</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
+<span class="w">  </span><span class="nx">BOOTSTRAP_TOKENS</span><span class="p">.</span><span class="ow">delete</span><span class="p">(</span><span class="nx">token</span><span class="p">);</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// bootstrap/action/route.ts — tambah CSRF check</span>
+<span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">POST</span><span class="p">(</span><span class="nx">req</span><span class="o">:</span><span class="w"> </span><span class="kt">NextRequest</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// CSRF check</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">csrfToken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">req</span><span class="p">.</span><span class="nx">headers</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s2">&quot;x-csrf-token&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">csrfToken</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">!</span><span class="nx">validateBootstrapToken</span><span class="p">(</span><span class="nx">csrfToken</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">({</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Invalid request&quot;</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">403</span><span class="w"> </span><span class="p">});</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// Rate limit</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">req</span><span class="p">.</span><span class="nx">headers</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s2">&quot;x-forwarded-for&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s2">&quot;unknown&quot;</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">allowed</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">rateLimit</span><span class="p">(</span><span class="sb">`bootstrap:</span><span class="si">${</span><span class="nx">ip</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="mf">3</span><span class="p">,</span><span class="w"> </span><span class="mf">3600</span><span class="nx">_000</span><span class="p">);</span><span class="w"> </span><span class="c1">// 3 attempts per jam</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">allowed</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">({</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Too many attempts&quot;</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">429</span><span class="w"> </span><span class="p">});</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="kt">noAdmin</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span><span class="p">.</span><span class="nx">rpc</span><span class="p">(</span><span class="s2">&quot;has_no_admin&quot;</span><span class="p">).</span><span class="nx">single</span><span class="p">();</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">noAdmin</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">({</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Admin sudah ada&quot;</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">403</span><span class="w"> </span><span class="p">});</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// ... sisanya sama</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 45 menit<br />
+<strong>Risk if skipped:</strong> 🟠 Unauthorized admin creation</p>
+<hr />
+<h3>🟠 PHASE 2 — High Priority (1-2 hari)</h3>
+<h4>T8. RLS Policy Implementation</h4>
+<p><strong>File:</strong> Migrasi SQL (via Supabase Dashboard atau migration file)</p>
+<p><strong>Masalah:</strong> Semua operasi pakai <code>createAdminClient()</code> (service role), jadi RLS gak pernah di-test.</p>
+<p><strong>Fix — RLS Policies:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">-- 1. Aktifkan RLS di semua tabel</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="n">ENABLE</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">LEVEL</span><span class="w"> </span><span class="k">SECURITY</span><span class="p">;</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">categories</span><span class="w"> </span><span class="n">ENABLE</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">LEVEL</span><span class="w"> </span><span class="k">SECURITY</span><span class="p">;</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">site_settings</span><span class="w"> </span><span class="n">ENABLE</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">LEVEL</span><span class="w"> </span><span class="k">SECURITY</span><span class="p">;</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">order_leads</span><span class="w"> </span><span class="n">ENABLE</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">LEVEL</span><span class="w"> </span><span class="k">SECURITY</span><span class="p">;</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">landing_sections</span><span class="w"> </span><span class="n">ENABLE</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">LEVEL</span><span class="w"> </span><span class="k">SECURITY</span><span class="p">;</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">custom_landing_pages</span><span class="w"> </span><span class="n">ENABLE</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">LEVEL</span><span class="w"> </span><span class="k">SECURITY</span><span class="p">;</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">product_spec_values</span><span class="w"> </span><span class="n">ENABLE</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">LEVEL</span><span class="w"> </span><span class="k">SECURITY</span><span class="p">;</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">product_documents</span><span class="w"> </span><span class="n">ENABLE</span><span class="w"> </span><span class="k">ROW</span><span class="w"> </span><span class="k">LEVEL</span><span class="w"> </span><span class="k">SECURITY</span><span class="p">;</span>
+
+<span class="c1">-- 2. Policy untuk products: owner hanya bisa lihat/edit produknya sendiri</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="n">POLICY</span><span class="w"> </span><span class="ss">&quot;products_owner_select&quot;</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="k">FOR</span><span class="w"> </span><span class="k">SELECT</span>
+<span class="w">  </span><span class="k">USING</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">auth</span><span class="p">.</span><span class="n">uid</span><span class="p">());</span>
+
+<span class="k">CREATE</span><span class="w"> </span><span class="n">POLICY</span><span class="w"> </span><span class="ss">&quot;products_owner_insert&quot;</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="k">FOR</span><span class="w"> </span><span class="k">INSERT</span>
+<span class="w">  </span><span class="k">WITH</span><span class="w"> </span><span class="k">CHECK</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">auth</span><span class="p">.</span><span class="n">uid</span><span class="p">());</span>
+
+<span class="k">CREATE</span><span class="w"> </span><span class="n">POLICY</span><span class="w"> </span><span class="ss">&quot;products_owner_update&quot;</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="k">FOR</span><span class="w"> </span><span class="k">UPDATE</span>
+<span class="w">  </span><span class="k">USING</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">auth</span><span class="p">.</span><span class="n">uid</span><span class="p">())</span>
+<span class="w">  </span><span class="k">WITH</span><span class="w"> </span><span class="k">CHECK</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">auth</span><span class="p">.</span><span class="n">uid</span><span class="p">());</span>
+
+<span class="k">CREATE</span><span class="w"> </span><span class="n">POLICY</span><span class="w"> </span><span class="ss">&quot;products_owner_delete&quot;</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="k">FOR</span><span class="w"> </span><span class="k">DELETE</span>
+<span class="w">  </span><span class="k">USING</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">auth</span><span class="p">.</span><span class="n">uid</span><span class="p">());</span>
+
+<span class="c1">-- 3. Policy untuk public: hanya visible product</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="n">POLICY</span><span class="w"> </span><span class="ss">&quot;products_public_select&quot;</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="k">FOR</span><span class="w"> </span><span class="k">SELECT</span>
+<span class="w">  </span><span class="k">USING</span><span class="w"> </span><span class="p">(</span><span class="n">is_visible</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">true</span><span class="p">);</span>
+
+<span class="c1">-- 4. Policy untuk superadmin: bisa lihat semua</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="n">POLICY</span><span class="w"> </span><span class="ss">&quot;products_superadmin_all&quot;</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">products</span><span class="w"> </span><span class="k">FOR</span><span class="w"> </span><span class="k">ALL</span>
+<span class="w">  </span><span class="k">USING</span><span class="w"> </span><span class="p">(</span><span class="n">auth</span><span class="p">.</span><span class="n">jwt</span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;&gt;</span><span class="w"> </span><span class="s1">&#39;role&#39;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;superadmin&#39;</span><span class="p">);</span>
+</code></pre></div>
+
+<p><strong>Setelah RLS aktif, migrasi bertahap dari <code>createAdminClient()</code> ke <code>createClient()</code>:</strong>
+- <code>public-data.ts</code> → tetap pakai <code>createAdminClient()</code> (butuh akses all rows untuk render toko)
+- <code>product-actions.ts</code> → bisa pindah ke <code>createClient()</code> + RLS filter by user_id
+- Admin pages → bisa pindah ke <code>createClient()</code></p>
+<p><strong>Effort:</strong> 3-4 jam<br />
+<strong>Risk if skipped:</strong> 🟠 Data leakage antar tenant via service role key leak</p>
+<hr />
+<h4>T9. Brute Force Protection — Progressive Delay</h4>
+<p><strong>File:</strong> <code>src/app/admin/login/action/route.ts</code></p>
+<p><strong>Masalah:</strong> Tidak ada batasan jumlah percobaan login. Attacker bisa brute force password.</p>
+<p><strong>Fix:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// Tambah progressive delay based on attempt count</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">loginAttempts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Map</span><span class="o">&lt;</span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">count</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="p">;</span><span class="w"> </span><span class="nx">lastAttempt</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="w"> </span><span class="p">}</span><span class="o">&gt;</span><span class="p">();</span>
+
+<span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">POST</span><span class="p">(</span><span class="nx">req</span><span class="o">:</span><span class="w"> </span><span class="kt">NextRequest</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">req</span><span class="p">.</span><span class="nx">headers</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s2">&quot;x-forwarded-for&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="nx">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)[</span><span class="mf">0</span><span class="p">]</span><span class="o">?</span><span class="p">.</span><span class="nx">trim</span><span class="p">()</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s2">&quot;unknown&quot;</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">attempt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">loginAttempts</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">ip</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">count</span><span class="o">:</span><span class="w"> </span><span class="kt">0</span><span class="p">,</span><span class="w"> </span><span class="nx">lastAttempt</span><span class="o">:</span><span class="w"> </span><span class="kt">0</span><span class="w"> </span><span class="p">};</span>
+
+<span class="w">  </span><span class="c1">// Progressive delay: 1s → 2s → 4s → 8s → 16s → 30s</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">delays</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1000</span><span class="p">,</span><span class="w"> </span><span class="mf">2000</span><span class="p">,</span><span class="w"> </span><span class="mf">4000</span><span class="p">,</span><span class="w"> </span><span class="mf">8000</span><span class="p">,</span><span class="w"> </span><span class="mf">16000</span><span class="p">,</span><span class="w"> </span><span class="mf">30000</span><span class="p">];</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">delay</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">delays</span><span class="p">[</span><span class="nb">Math</span><span class="p">.</span><span class="nx">min</span><span class="p">(</span><span class="nx">attempt</span><span class="p">.</span><span class="nx">count</span><span class="p">,</span><span class="w"> </span><span class="nx">delays</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">1</span><span class="p">)];</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">delay</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Promise</span><span class="p">((</span><span class="nx">resolve</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">setTimeout</span><span class="p">(</span><span class="nx">resolve</span><span class="p">,</span><span class="w"> </span><span class="nx">delay</span><span class="p">));</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">req</span><span class="p">.</span><span class="nx">json</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">email</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">String</span><span class="p">(</span><span class="nx">body</span><span class="p">.</span><span class="nx">email</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">).</span><span class="nx">trim</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">String</span><span class="p">(</span><span class="nx">body</span><span class="p">.</span><span class="nx">password</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Di bawah ini rate limit 5 attempts / 15 menit (dari middleware)</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span><span class="p">.</span><span class="nx">auth</span><span class="p">.</span><span class="nx">signInWithPassword</span><span class="p">({</span><span class="w"> </span><span class="nx">email</span><span class="p">,</span><span class="w"> </span><span class="nx">password</span><span class="w"> </span><span class="p">});</span>
+
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">!</span><span class="nx">data</span><span class="p">.</span><span class="nx">user</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Increment attempt counter</span>
+<span class="w">    </span><span class="nx">loginAttempts</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="nx">ip</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">count</span><span class="o">:</span><span class="w"> </span><span class="kt">attempt.count</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="nx">lastAttempt</span><span class="o">:</span><span class="w"> </span><span class="kt">Date.now</span><span class="p">()</span><span class="w"> </span><span class="p">});</span>
+
+<span class="w">    </span><span class="c1">// Lockout setelah 10 gagal</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">attempt</span><span class="p">.</span><span class="nx">count</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mf">10</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">(</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Akun terkunci sementara. Coba lagi dalam 30 menit.&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">429</span><span class="w"> </span><span class="p">}</span>
+<span class="w">      </span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">(</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Email atau kata sandi salah&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">401</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// Reset counter on success</span>
+<span class="w">  </span><span class="nx">loginAttempts</span><span class="p">.</span><span class="ow">delete</span><span class="p">(</span><span class="nx">ip</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// ... sisanya</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 1 jam<br />
+<strong>Risk if skipped:</strong> 🟠 Brute force attack sukses</p>
+<hr />
+<h4>T10. Input Validation Library — Zod di Semua API</h4>
+<p><strong>Files:</strong> 
+- <code>src/app/api/order-lead/route.ts</code> ✓ (fix di T4)
+- <code>src/app/api/track/route.ts</code>
+- <code>src/app/admin/login/action/route.ts</code>
+- <code>src/app/admin/landing/upload/route.ts</code>
+- <code>src/app/api/admin/products/export/route.ts</code></p>
+<p><strong>Masalah:</strong> Tracking endpoint terima input tanpa validasi minimal.</p>
+<p><strong>Fix — track API:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">trackSchema</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">z</span><span class="p">.</span><span class="nx">object</span><span class="p">({</span>
+<span class="w">  </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="kt">z.string</span><span class="p">().</span><span class="nx">min</span><span class="p">(</span><span class="mf">1</span><span class="p">).</span><span class="nx">max</span><span class="p">(</span><span class="mf">500</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="nx">regex</span><span class="p">(</span><span class="sr">/^\//</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Path harus dimulai dengan /&quot;</span><span class="p">),</span>
+<span class="p">});</span>
+
+<span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">POST</span><span class="p">(</span><span class="nx">req</span><span class="o">:</span><span class="w"> </span><span class="kt">NextRequest</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">req</span><span class="p">.</span><span class="nx">json</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">parsed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">trackSchema</span><span class="p">.</span><span class="nx">safeParse</span><span class="p">(</span><span class="nx">body</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">parsed</span><span class="p">.</span><span class="nx">success</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">({</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Invalid path&quot;</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">400</span><span class="w"> </span><span class="p">});</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">path</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">parsed</span><span class="p">.</span><span class="nx">data</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// ... sisanya</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 2 jam untuk semua endpoint<br />
+<strong>Risk if skipped:</strong> 🟢 Data quality issues, minor injection vectors</p>
+<hr />
+<h4>T11. Supabase Storage RLS</h4>
+<p><strong>Masalah:</strong> Bucket <code>product-images</code>, <code>product-documents</code>, <code>category-media</code>, <code>landing-media</code>, <code>brand-assets</code> menggunakan service role untuk upload dan public URL untuk akses. Tidak ada RLS policy.</p>
+<p><strong>Fix di Supabase SQL:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">-- Product images: public read, authenticated write</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="n">POLICY</span><span class="w"> </span><span class="ss">&quot;product_images_public_select&quot;</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="k">storage</span><span class="p">.</span><span class="n">objects</span><span class="w"> </span><span class="k">FOR</span><span class="w"> </span><span class="k">SELECT</span>
+<span class="w">  </span><span class="k">USING</span><span class="w"> </span><span class="p">(</span><span class="n">bucket_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;product-images&#39;</span><span class="p">);</span>
+
+<span class="k">CREATE</span><span class="w"> </span><span class="n">POLICY</span><span class="w"> </span><span class="ss">&quot;product_images_auth_insert&quot;</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="k">storage</span><span class="p">.</span><span class="n">objects</span><span class="w"> </span><span class="k">FOR</span><span class="w"> </span><span class="k">INSERT</span>
+<span class="w">  </span><span class="k">WITH</span><span class="w"> </span><span class="k">CHECK</span><span class="w"> </span><span class="p">(</span>
+<span class="w">    </span><span class="n">bucket_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;product-images&#39;</span>
+<span class="w">    </span><span class="k">AND</span><span class="w"> </span><span class="n">auth</span><span class="p">.</span><span class="k">role</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;authenticated&#39;</span>
+<span class="w">  </span><span class="p">);</span>
+
+<span class="c1">-- Repeat for each bucket...</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 30 menit<br />
+<strong>Risk if skipped:</strong> 🟡 Anyone with the storage URL could potentially upload via service role</p>
+<hr />
+<h4>T12. Audit Logging untuk Admin Actions</h4>
+<p><strong>File:</strong> <code>src/lib/audit-log.ts</code> (baru)</p>
+<p><strong>Masalah:</strong> Tidak ada catatan siapa melakukan apa di admin panel. Kalau ada kejadian, impossible untuk trace.</p>
+<p><strong>Fix:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// src/lib/audit-log.ts</span>
+<span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">createAdminClient</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;./supabase/server&quot;</span><span class="p">;</span>
+
+<span class="k">export</span><span class="w"> </span><span class="kr">type</span><span class="w"> </span><span class="nx">AuditAction</span><span class="w"> </span><span class="o">=</span>
+<span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;product.create&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;product.update&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;product.delete&quot;</span>
+<span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;category.create&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;category.update&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;category.delete&quot;</span>
+<span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;admin.login&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;admin.logout&quot;</span>
+<span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;subscription.update&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;subscription.extend&quot;</span>
+<span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;superadmin.access&quot;</span>
+<span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;settings.update&quot;</span>
+<span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;landing.update&quot;</span><span class="p">;</span>
+
+<span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">logAudit</span><span class="p">(</span>
+<span class="w">  </span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">action</span><span class="o">:</span><span class="w"> </span><span class="kt">AuditAction</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">metadata?</span><span class="o">:</span><span class="w"> </span><span class="kt">Record</span><span class="o">&lt;</span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">unknown</span><span class="o">&gt;</span>
+<span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">createAdminClient</span><span class="p">();</span>
+<span class="w">  </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;audit_logs&quot;</span><span class="p">).</span><span class="nx">insert</span><span class="p">({</span>
+<span class="w">      </span><span class="nx">user_id</span><span class="o">:</span><span class="w"> </span><span class="kt">userId</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">action</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">metadata</span><span class="o">:</span><span class="w"> </span><span class="kt">metadata</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">      </span><span class="nx">ip_address</span><span class="o">:</span><span class="w"> </span><span class="kt">null</span><span class="p">,</span><span class="w"> </span><span class="c1">// TODO: pass from request</span>
+<span class="w">      </span><span class="nx">user_agent</span><span class="o">:</span><span class="w"> </span><span class="kt">null</span><span class="p">,</span>
+<span class="w">    </span><span class="p">});</span>
+<span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s2">&quot;[Audit Log] Failed:&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">e</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Jangan throw — audit log failure gak boleh block main flow</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Integrasi di product actions:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// product-actions.ts — setelah save sukses</span>
+<span class="k">await</span><span class="w"> </span><span class="nx">logAudit</span><span class="p">(</span><span class="nx">userId</span><span class="p">,</span><span class="w"> </span><span class="nx">input</span><span class="p">.</span><span class="nx">id</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="s2">&quot;product.update&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;product.create&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">productId</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">productName</span><span class="o">:</span><span class="w"> </span><span class="kt">input.name</span><span class="p">,</span>
+<span class="p">});</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 2 jam<br />
+<strong>Risk if skipped:</strong> 🟡 No audit trail, hard to investigate security incidents</p>
+<hr />
+<h4>T13. Environment Variable Validation di Startup</h4>
+<p><strong>File:</strong> <code>src/lib/env.ts</code> (baru)</p>
+<p><strong>Masalah:</strong> Import <code>createAdminClient()</code> bisa throw error kalau <code>SUPABASE_SERVICE_ROLE_KEY</code> gak di-set, tapi baru ketahuan pas runtime.</p>
+<p><strong>Fix:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// src/lib/env.ts</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">requiredEnvVars</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="s2">&quot;NEXT_PUBLIC_SUPABASE_URL&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;NEXT_PUBLIC_SUPABASE_ANON_KEY&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;SUPABASE_SERVICE_ROLE_KEY&quot;</span><span class="p">,</span>
+<span class="p">]</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="kd">const</span><span class="p">;</span>
+
+<span class="kd">const</span><span class="w"> </span><span class="nx">optionalEnvVars</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="s2">&quot;NEXT_PUBLIC_ADMIN_WA&quot;</span><span class="p">,</span>
+<span class="p">]</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="kd">const</span><span class="p">;</span>
+
+<span class="k">export</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">validateEnv</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">missing</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[];</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kd">const</span><span class="w"> </span><span class="nx">key</span><span class="w"> </span><span class="k">of</span><span class="w"> </span><span class="nx">requiredEnvVars</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">[</span><span class="nx">key</span><span class="p">])</span><span class="w"> </span><span class="nx">missing</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="nx">key</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">missing</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span>
+<span class="w">      </span><span class="sb">`❌ Missing required environment variables:\n  </span><span class="si">${</span><span class="nx">missing</span><span class="p">.</span><span class="nx">join</span><span class="p">(</span><span class="s2">&quot;\n  &quot;</span><span class="p">)</span><span class="si">}</span><span class="sb">\n`</span><span class="w"> </span><span class="o">+</span>
+<span class="w">      </span><span class="s2">&quot;Check .env.local or Coolify environment settings.&quot;</span>
+<span class="w">    </span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// Validate URL format</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">NEXT_PUBLIC_SUPABASE_URL</span><span class="o">!</span><span class="p">;</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">url</span><span class="p">.</span><span class="nx">startsWith</span><span class="p">(</span><span class="s2">&quot;https://&quot;</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="s2">&quot;NEXT_PUBLIC_SUPABASE_URL harus https://&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Panggil di layout.tsx atau early in app lifecycle</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 30 menit<br />
+<strong>Risk if skipped:</strong> 🟢 Runtime error instead of startup error</p>
+<hr />
+<h3>🔵 PHASE 3 — Medium (3-5 hari)</h3>
+<h4>T14. Supabase Row Level Security — Migrasi Bertahap</h4>
+<p><strong>Masalah:</strong> Semua admin query pakai <code>createAdminClient()</code> (service role). After RLS policies applied, kita perlu migrasi bertahap.</p>
+<p><strong>Strategy:</strong>
+1. Buat RLS policies (T8)
+2. <strong>Ganti <code>product-actions.ts</code></strong> — pindah ke <code>createClient()</code> karena sudah filter user_id via RLS
+3. <strong>Ganti admin pages</strong> — pindah ke <code>createClient()</code>
+4. <strong><code>public-data.ts</code> tetap pakai service role</strong> — karena perlu akses multi-tenant untuk toko publik
+5. Tambah middleware yang detect kalau <code>createClient()</code> di admin area dan user_id gak match → block</p>
+<p><strong>Effort:</strong> 4-6 jam<br />
+<strong>Risk if skipped:</strong> 🟡 Service role key exposure risk lebih tinggi</p>
+<hr />
+<h4>T15. Cookie Security — Session Configuration</h4>
+<p><strong>File:</strong> Supabase SSR config di <code>src/lib/supabase/server.ts</code> dan <code>middleware.ts</code></p>
+<p><strong>Masalah:</strong> Cookie default Supabase bisa diakses JavaScript (no httpOnly flag), dan tidak ada sameSite strict.</p>
+<p><strong>Fix:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// server.ts — set cookie options</span>
+<span class="k">return</span><span class="w"> </span><span class="nx">createServerClient</span><span class="p">(</span><span class="nx">url</span><span class="p">,</span><span class="w"> </span><span class="nx">anonKey</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">cookies</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">getAll</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nx">cookieStore</span><span class="p">.</span><span class="nx">getAll</span><span class="p">();</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nx">setAll</span><span class="p">(</span><span class="nx">cookiesToSet</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">cookiesToSet</span><span class="p">.</span><span class="nx">forEach</span><span class="p">(({</span><span class="w"> </span><span class="nx">name</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="p">,</span><span class="w"> </span><span class="nx">options</span><span class="w"> </span><span class="p">})</span><span class="w"> </span><span class="p">=&gt;</span>
+<span class="w">        </span><span class="nx">cookieStore</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="nx">name</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="p">...</span><span class="nx">options</span><span class="p">,</span>
+<span class="w">          </span><span class="nx">httpOnly</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="p">,</span>
+<span class="w">          </span><span class="nx">secure</span><span class="o">:</span><span class="w"> </span><span class="kt">process.env.NODE_ENV</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;production&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nx">sameSite</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;lax&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// strict bisa break redirect flow</span>
+<span class="w">          </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;/&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="p">})</span>
+<span class="w">      </span><span class="p">);</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="p">});</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 30 menit<br />
+<strong>Risk if skipped:</strong> 🟢 Cookie bisa dibaca XSS, CSRF via subdomain</p>
+<hr />
+<h4>T16. Remove Console Log dari Production</h4>
+<p><strong>Files:</strong> Scan <code>console.log</code>, <code>console.error</code> di semua server files.</p>
+<p><strong>Masalah:</strong> Console log di production bisa expose data sensitif (user_id, email, product names) dan memory leak.</p>
+<p><strong>Fix:</strong> Ganti <code>console.log</code> di <code>product-actions.ts:75</code> dengan silent. Ganti <code>console.error</code> dengan structured logger.</p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// src/lib/logger.ts</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">isDev</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">NODE_ENV</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;development&quot;</span><span class="p">;</span>
+
+<span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">logger</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">info</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="nx">msg</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">...args</span><span class="o">:</span><span class="w"> </span><span class="kt">unknown</span><span class="p">[])</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">isDev</span><span class="p">)</span><span class="w"> </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="sb">`[INFO] </span><span class="si">${</span><span class="nx">msg</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="p">...</span><span class="nx">args</span><span class="p">);</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="nx">msg</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">...args</span><span class="o">:</span><span class="w"> </span><span class="kt">unknown</span><span class="p">[])</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Di production, kirim ke Sentry</span>
+<span class="w">    </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="sb">`[ERROR] </span><span class="si">${</span><span class="nx">msg</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="p">...</span><span class="nx">args</span><span class="p">);</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">warn</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="nx">msg</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">...args</span><span class="o">:</span><span class="w"> </span><span class="kt">unknown</span><span class="p">[])</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">isDev</span><span class="p">)</span><span class="w"> </span><span class="nx">console</span><span class="p">.</span><span class="nx">warn</span><span class="p">(</span><span class="sb">`[WARN] </span><span class="si">${</span><span class="nx">msg</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="p">...</span><span class="nx">args</span><span class="p">);</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 1 jam<br />
+<strong>Risk if skipped:</strong> 🟢 Data leak via logs, memory leak</p>
+<hr />
+<h4>T17. Session Timeout &amp; Refresh</h4>
+<p><strong>Masalah:</strong> Session Supabase default long-lived. Admin yang lupa logout bisa diakses orang lain.</p>
+<p><strong>Fix di middleware:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// middleware.ts — tambah session timeout check</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">SESSION_TIMEOUT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">60</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">60</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">1000</span><span class="p">;</span><span class="w"> </span><span class="c1">// 1 jam inactivity</span>
+
+<span class="c1">// Di updateSession:</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">user</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">lastActivity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">request</span><span class="p">.</span><span class="nx">cookies</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s2">&quot;last_activity&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="nx">value</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">now</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">();</span>
+
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">lastActivity</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="p">(</span><span class="nx">now</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nb">Number</span><span class="p">(</span><span class="nx">lastActivity</span><span class="p">))</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="nx">SESSION_TIMEOUT</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Session expired — sign out</span>
+<span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span><span class="p">.</span><span class="nx">auth</span><span class="p">.</span><span class="nx">signOut</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">request</span><span class="p">.</span><span class="nx">nextUrl</span><span class="p">.</span><span class="nx">clone</span><span class="p">();</span>
+<span class="w">    </span><span class="nx">url</span><span class="p">.</span><span class="nx">pathname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;/admin/login&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="nx">url</span><span class="p">.</span><span class="nx">searchParams</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="s2">&quot;expired&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;true&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">redirect</span><span class="p">(</span><span class="nx">url</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// Update last activity</span>
+<span class="w">  </span><span class="nx">supabaseResponse</span><span class="p">.</span><span class="nx">cookies</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="s2">&quot;last_activity&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">String</span><span class="p">(</span><span class="nx">now</span><span class="p">),</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">httpOnly</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">secure</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">sameSite</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;lax&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">maxAge</span><span class="o">:</span><span class="w"> </span><span class="kt">SESSION_TIMEOUT</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1000</span><span class="p">,</span>
+<span class="w">  </span><span class="p">});</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 1 jam<br />
+<strong>Risk if skipped:</strong> 🟢 Abandoned sessions bisa diakses publik</p>
+<hr />
+<h3>🟢 PHASE 4 — Monitoring &amp; Infrastructure (1 minggu)</h3>
+<h4>T18. Sentry Error Tracking</h4>
+<div class="codehilite"><pre><span></span><code>npm<span class="w"> </span>install<span class="w"> </span>@sentry/nextjs
+npx<span class="w"> </span>sentry-wizard<span class="w"> </span>-i<span class="w"> </span>nextjs
+</code></pre></div>
+
+<p><strong>Konfigurasi:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// sentry.client.config.ts</span>
+<span class="k">import</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">Sentry</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;@sentry/nextjs&quot;</span><span class="p">;</span>
+<span class="nx">Sentry</span><span class="p">.</span><span class="nx">init</span><span class="p">({</span>
+<span class="w">  </span><span class="nx">dsn</span><span class="o">:</span><span class="w"> </span><span class="kt">process.env.NEXT_PUBLIC_SENTRY_DSN</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">tracesSampleRate</span><span class="o">:</span><span class="w"> </span><span class="kt">0.1</span><span class="p">,</span><span class="w"> </span><span class="c1">// 10% di production</span>
+<span class="w">  </span><span class="nx">environment</span><span class="o">:</span><span class="w"> </span><span class="kt">process.env.NODE_ENV</span><span class="p">,</span>
+<span class="p">});</span>
+
+<span class="c1">// sentry.server.config.ts — sama, dengan sample rate lebih tinggi</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 1 jam<br />
+<strong>Benefit:</strong> Lihat error realtime, performance monitoring</p>
+<hr />
+<h4>T19. Health Check Endpoint</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1">// src/app/api/health/route.ts</span>
+<span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">NextResponse</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;next/server&quot;</span><span class="p">;</span>
+<span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">createAdminClient</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;@/lib/supabase/server&quot;</span><span class="p">;</span>
+
+<span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">GET</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">checks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">timestamp</span><span class="o">:</span><span class="w"> </span><span class="kt">new</span><span class="w"> </span><span class="nb">Date</span><span class="p">().</span><span class="nx">toISOString</span><span class="p">(),</span>
+<span class="w">    </span><span class="nx">uptime</span><span class="o">:</span><span class="w"> </span><span class="kt">process.uptime</span><span class="p">(),</span>
+<span class="w">  </span><span class="p">};</span>
+
+<span class="w">  </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">supabase</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">createAdminClient</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">count</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">supabase</span>
+<span class="w">      </span><span class="p">.</span><span class="kr">from</span><span class="p">(</span><span class="s2">&quot;products&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="nx">select</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">count</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;exact&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">head</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">});</span>
+<span class="w">    </span><span class="nx">checks</span><span class="p">.</span><span class="nx">db</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;connected&quot;</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">checks</span><span class="p">.</span><span class="nx">db</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;error&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="nx">checks</span><span class="p">.</span><span class="nx">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;degraded&quot;</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">checks</span><span class="p">.</span><span class="nx">status</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="nx">200</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">503</span><span class="p">;</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">NextResponse</span><span class="p">.</span><span class="nx">json</span><span class="p">(</span><span class="nx">checks</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">status</span><span class="w"> </span><span class="p">});</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 15 menit<br />
+<strong>Benefit:</strong> Monitoring Coolify auto-restart, uptime tracking</p>
+<hr />
+<h4>T20. Automated Security Testing Playwright</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1">// e2e/security.spec.ts</span>
+<span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">test</span><span class="p">,</span><span class="w"> </span><span class="nx">expect</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;@playwright/test&quot;</span><span class="p">;</span>
+
+<span class="nx">test</span><span class="p">(</span><span class="s2">&quot;security headers exist&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="p">({</span><span class="w"> </span><span class="nx">page</span><span class="w"> </span><span class="p">})</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="kr">goto</span><span class="p">(</span><span class="s2">&quot;/admin/login&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">headers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">response</span><span class="o">?</span><span class="p">.</span><span class="nx">allHeaders</span><span class="p">();</span>
+<span class="w">  </span><span class="nx">expect</span><span class="p">(</span><span class="nx">headers</span><span class="p">[</span><span class="s2">&quot;x-frame-options&quot;</span><span class="p">]).</span><span class="nx">toBe</span><span class="p">(</span><span class="s2">&quot;DENY&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="nx">expect</span><span class="p">(</span><span class="nx">headers</span><span class="p">[</span><span class="s2">&quot;x-content-type-options&quot;</span><span class="p">]).</span><span class="nx">toBe</span><span class="p">(</span><span class="s2">&quot;nosniff&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="nx">expect</span><span class="p">(</span><span class="nx">headers</span><span class="p">[</span><span class="s2">&quot;strict-transport-security&quot;</span><span class="p">]).</span><span class="nx">toBeDefined</span><span class="p">();</span>
+<span class="p">});</span>
+
+<span class="nx">test</span><span class="p">(</span><span class="s2">&quot;login rate limiting&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="p">({</span><span class="w"> </span><span class="nx">page</span><span class="w"> </span><span class="p">})</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kd">let</span><span class="w"> </span><span class="nx">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0</span><span class="p">;</span><span class="w"> </span><span class="nx">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mf">6</span><span class="p">;</span><span class="w"> </span><span class="nx">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="kr">goto</span><span class="p">(</span><span class="s2">&quot;/admin/login&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="nx">fill</span><span class="p">(</span><span class="s2">&quot;#email&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;test@test.com&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="nx">fill</span><span class="p">(</span><span class="s2">&quot;#password&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;wrongpassword&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="nx">click</span><span class="p">(</span><span class="s2">&quot;button[type=submit]&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">toast</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="nx">locator</span><span class="p">(</span><span class="s2">&quot;.toast-error&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">await</span><span class="w"> </span><span class="nx">expect</span><span class="p">(</span><span class="nx">toast</span><span class="p">).</span><span class="nx">toContainText</span><span class="p">(</span><span class="s2">&quot;Terlalu banyak&quot;</span><span class="p">);</span>
+<span class="p">});</span>
+
+<span class="nx">test</span><span class="p">(</span><span class="s2">&quot;XSS not possible in order lead&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="p">({</span><span class="w"> </span><span class="nx">page</span><span class="w"> </span><span class="p">})</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="nx">request</span><span class="p">.</span><span class="nx">post</span><span class="p">(</span><span class="s2">&quot;/api/order-lead&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">storeSlug</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">itemsSummary</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;test&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">});</span>
+<span class="w">  </span><span class="nx">expect</span><span class="p">(</span><span class="nx">response</span><span class="p">.</span><span class="nx">status</span><span class="p">()).</span><span class="nx">toBe</span><span class="p">(</span><span class="mf">400</span><span class="p">);</span><span class="w"> </span><span class="c1">// Harus ditolak</span>
+<span class="p">});</span>
+</code></pre></div>
+
+<p><strong>Effort:</strong> 2-3 jam<br />
+<strong>Benefit:</strong> Regression test untuk security fixes</p>
+<hr />
+<h2>📋 Executive Summary — Prioritized Task List</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Task</th>
+<th>Effort</th>
+<th>Impact</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T1</td>
+<td>Fix auth redirect &amp; guard</td>
+<td>15m</td>
+<td>🔴 Critical</td>
+<td><strong>Week 1</strong></td>
+</tr>
+<tr>
+<td>T2</td>
+<td>Security headers + CSP</td>
+<td>30m</td>
+<td>🔴 Critical</td>
+<td><strong>Week 1</strong></td>
+</tr>
+<tr>
+<td>T3</td>
+<td>Rate limiting middleware</td>
+<td>1h</td>
+<td>🔴 Critical</td>
+<td><strong>Week 1</strong></td>
+</tr>
+<tr>
+<td>T4</td>
+<td>Input validation order-lead</td>
+<td>1h</td>
+<td>🟠 High</td>
+<td><strong>Week 1</strong></td>
+</tr>
+<tr>
+<td>T5</td>
+<td>XSS prevention landing page</td>
+<td>1h</td>
+<td>🔴 Critical</td>
+<td><strong>Week 1</strong></td>
+</tr>
+<tr>
+<td>T6</td>
+<td>Remove hardcoded secrets</td>
+<td>15m</td>
+<td>🟠 High</td>
+<td><strong>Week 1</strong></td>
+</tr>
+<tr>
+<td>T7</td>
+<td>CSRF bootstrap endpoint</td>
+<td>45m</td>
+<td>🟠 High</td>
+<td><strong>Week 1</strong></td>
+</tr>
+<tr>
+<td>T8</td>
+<td>RLS policies</td>
+<td>3-4h</td>
+<td>🟠 High</td>
+<td><strong>Week 2</strong></td>
+</tr>
+<tr>
+<td>T9</td>
+<td>Brute force protection</td>
+<td>1h</td>
+<td>🟠 High</td>
+<td><strong>Week 2</strong></td>
+</tr>
+<tr>
+<td>T10</td>
+<td>Zod validation semua API</td>
+<td>2h</td>
+<td>🟡 Medium</td>
+<td><strong>Week 2</strong></td>
+</tr>
+<tr>
+<td>T11</td>
+<td>Storage RLS</td>
+<td>30m</td>
+<td>🟡 Medium</td>
+<td><strong>Week 2</strong></td>
+</tr>
+<tr>
+<td>T12</td>
+<td>Audit logging</td>
+<td>2h</td>
+<td>🟡 Medium</td>
+<td><strong>Week 2</strong></td>
+</tr>
+<tr>
+<td>T13</td>
+<td>Env validation startup</td>
+<td>30m</td>
+<td>🟢 Low</td>
+<td><strong>Week 2</strong></td>
+</tr>
+<tr>
+<td>T14</td>
+<td>Migrasi ke RLS (createClient)</td>
+<td>4-6h</td>
+<td>🟡 Medium</td>
+<td><strong>Week 3</strong></td>
+</tr>
+<tr>
+<td>T15</td>
+<td>Cookie security config</td>
+<td>30m</td>
+<td>🟡 Medium</td>
+<td><strong>Week 3</strong></td>
+</tr>
+<tr>
+<td>T16</td>
+<td>Remove console.log</td>
+<td>1h</td>
+<td>🟢 Low</td>
+<td><strong>Week 3</strong></td>
+</tr>
+<tr>
+<td>T17</td>
+<td>Session timeout</td>
+<td>1h</td>
+<td>🟢 Low</td>
+<td><strong>Week 3</strong></td>
+</tr>
+<tr>
+<td>T18</td>
+<td>Sentry error tracking</td>
+<td>1h</td>
+<td>🟡 Medium</td>
+<td><strong>Week 3</strong></td>
+</tr>
+<tr>
+<td>T19</td>
+<td>Health check endpoint</td>
+<td>15m</td>
+<td>🟢 Low</td>
+<td><strong>Week 3</strong></td>
+</tr>
+<tr>
+<td>T20</td>
+<td>Automated security tests</td>
+<td>2-3h</td>
+<td>🟢 Low</td>
+<td><strong>Week 4</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Total estimated effort:</strong> ~25 jam (3-4 hari kerja full)</p>
+<hr />
+<h2>🏁 Security Score Progression</h2>
+<div class="codehilite"><pre><span></span><code>Current:  🔴 3.5/10
+           ↓
+Week 1:   🟡 6.5/10  (Auth fix + headers + rate limit + XSS + CSRF)
+           ↓
+Week 2:   🟡 8.0/10  (RLS + brute force + validation + audit + storage)
+           ↓
+Week 3:   🔵 9.5/10  (Cookie + session + sentry + health + env validation)
+           ↓
+Week 4:   🔵 10/10   (Automated tests + performance review)
+</code></pre></div>
+
+<hr />
+<h2>🚨 Danger Items — Impact Analysis</h2>
+<table>
+<thead>
+<tr>
+<th>Attack Vector</th>
+<th>Likelihood</th>
+<th>Impact</th>
+<th>Risk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Brute force admin login</td>
+<td>🟠 Medium</td>
+<td>🔴 Full admin access</td>
+<td><strong>HIGH</strong></td>
+</tr>
+<tr>
+<td>XSS via custom LP</td>
+<td>🟢 Low</td>
+<td>🔴 Steal cookies, redirect</td>
+<td><strong>HIGH</strong></td>
+</tr>
+<tr>
+<td>Spam order leads</td>
+<td>🔴 High</td>
+<td>🟡 Data pollution</td>
+<td><strong>MEDIUM</strong></td>
+</tr>
+<tr>
+<td>Service role key leak</td>
+<td>🟢 Low</td>
+<td>🔴 All data accessible</td>
+<td><strong>HIGH</strong></td>
+</tr>
+<tr>
+<td>Clickjacking admin</td>
+<td>🟢 Low</td>
+<td>🔴 Admin action hijack</td>
+<td><strong>MEDIUM</strong></td>
+</tr>
+<tr>
+<td>DDoS API endpoints</td>
+<td>🟡 Medium</td>
+<td>🟡 Service disruption</td>
+<td><strong>MEDIUM</strong></td>
+</tr>
+<tr>
+<td>Session hijack</td>
+<td>🟡 Medium</td>
+<td>🟡 Access as admin</td>
+<td><strong>MEDIUM</strong></td>
+</tr>
+<tr>
+<td>Hardcoded secrets exposed</td>
+<td>🟡 Medium</td>
+<td>🟡 Fake bank details</td>
+<td><strong>LOW</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>🔧 Recommended Tools</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+<th>License</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>isomorphic-dompurify</strong></td>
+<td>Server-side HTML sanitization</td>
+<td>MIT</td>
+</tr>
+<tr>
+<td><strong>@sentry/nextjs</strong></td>
+<td>Error + performance monitoring</td>
+<td>Free tier</td>
+</tr>
+<tr>
+<td><strong>@upstash/ratelimit</strong></td>
+<td>Serverless rate limiting (Redis)</td>
+<td>Free tier</td>
+</tr>
+<tr>
+<td><strong>Playwright</strong></td>
+<td>E2E security testing</td>
+<td>Apache 2.0</td>
+</tr>
+<tr>
+<td><strong>zod</strong></td>
+<td>Input validation (already installed)</td>
+<td>MIT</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>✅ Verifikasi Security Checklist</h2>
+<p>Sebelum go-live, jalankan:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># 1. Security headers check</span>
+curl<span class="w"> </span>-s<span class="w"> </span>-I<span class="w"> </span>https://yourdomain.com<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s2">&quot;X-Frame|X-Content|Strict-Transport|Content-Security|Referrer-Policy&quot;</span>
+
+<span class="c1"># 2. Rate limit test (20 requests rapid)</span>
+<span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="k">$(</span>seq<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">25</span><span class="k">)</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w">  </span>curl<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-w<span class="w"> </span><span class="s2">&quot;%{http_code} &quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-X<span class="w"> </span>POST<span class="w"> </span>https://yourdomain.com/api/order-lead<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;storeSlug&quot;:&quot;test&quot;,&quot;itemsSummary&quot;:&quot;test&quot;}&#39;</span>
+<span class="k">done</span>
+<span class="c1"># Expect: 200 200 ... 429 setelah &gt;20</span>
+
+<span class="c1"># 3. Brute force test</span>
+<span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="k">$(</span>seq<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">15</span><span class="k">)</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w">  </span>curl<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-w<span class="w"> </span><span class="s2">&quot;%{http_code} &quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-X<span class="w"> </span>POST<span class="w"> </span>https://yourdomain.com/admin/login/action<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;email&quot;:&quot;admin@test.com&quot;,&quot;password&quot;:&quot;wrong&quot;}&#39;</span>
+<span class="k">done</span>
+<span class="c1"># Expect: 401 401 ... 429 dengan delay progresif</span>
+
+<span class="c1"># 4. XSS test</span>
+curl<span class="w"> </span>-s<span class="w"> </span>https://yourdomain.com/lp/xss-test<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;&lt;script&gt;&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;No XSS vector found&quot;</span>
+
+<span class="c1"># 5. Build + lint</span>
+npm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>run<span class="w"> </span>lint<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npx<span class="w"> </span>tsc<span class="w"> </span>--noEmit
+
+<span class="c1"># 6. Sentry test</span>
+curl<span class="w"> </span>https://yourdomain.com/api/sentry-test<span class="w">  </span><span class="c1"># Harus muncul di Sentry dashboard</span>
+</code></pre></div>
+
+<hr />
+<blockquote>
+<p><strong>Generated:</strong> 30 Juli 2026 | <strong>Auditor:</strong> AI-assisted | <strong>Status:</strong> 🔴 Security score 3.5/10 → 🎯 Target 10/10<br />
+<strong>File:</strong> <code>KatalogHub-go-live/SECURITY-HARDENING.md</code></p>
+</blockquote>
+<p style="text-align:center; color:#94a3b8; font-size:7pt; margin-top:20px; border-top:1px solid #e2e8f0; padding-top:8px;">
+  <strong>KatalogHub</strong> — Security Hardening Plan &bull; 30 Juli 2026
+</p>
+</body>
+</html>

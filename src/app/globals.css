@@ -1,0 +1,189 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Industrial teknikal - light */
+    --background: 0 0% 100%;
+    --foreground: 220 14% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 14% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 14% 11%;
+
+    /* Accent biru baja - kepercayaan teknik */
+    --primary: 217 91% 40%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 14% 11%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 35 92% 50%;
+    --accent-foreground: 220 14% 11%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 72% 42%;
+    --success-foreground: 210 40% 98%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 220 14% 11%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 40%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 220 26% 7%;
+    --foreground: 210 20% 92%;
+    --card: 220 24% 9%;
+    --card-foreground: 210 20% 92%;
+    --popover: 220 24% 9%;
+    --popover-foreground: 210 20% 92%;
+
+    --primary: 217 91% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 16% 16%;
+    --secondary-foreground: 210 20% 92%;
+    --muted: 220 16% 16%;
+    --muted-foreground: 220 10% 60%;
+    --accent: 35 92% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 220 26% 7%;
+
+    --border: 220 16% 18%;
+    --input: 220 16% 20%;
+    --ring: 217 91% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+  }
+
+  /* Custom Sleek Thin Scrollbar untuk Chrome, Edge, Safari */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 9999px;
+    transition: background-color 0.2s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--primary) / 0.8);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  html {
+    @apply scroll-smooth;
+    overflow-x: clip;
+    max-width: 100vw;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    overflow-x: clip;
+    max-width: 100vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  /* Pola grid teknis untuk background section tertentu */
+  .bg-grid-technical {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .bg-grid-dots {
+    background-image: radial-gradient(hsl(var(--border) / 0.8) 1.2px, transparent 1.2px);
+    background-size: 18px 18px;
+  }
+  /* Tekstur Kertas Bintik (Dot Grid Paper) untuk Section Harga & Solusi */
+  .bg-paper-dots {
+    background-image: radial-gradient(hsl(var(--primary) / 0.15) 1.3px, transparent 1.3px);
+    background-size: 20px 20px;
+  }
+  /* Tekstur Kertas Milimeter (Technical Blueprint) untuk Section Fitur & Live Demo */
+  .bg-paper-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--primary) / 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) / 0.08) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Memastikan semua tombol/elemen dengan background biru menggunakan teks putih saat Dark Mode */
+  .dark .bg-primary,
+  .dark button.bg-primary,
+  .dark a.bg-primary,
+  .dark .bg-blue-500,
+  .dark .bg-blue-600,
+  .dark .bg-blue-700,
+  .dark button[class*="bg-blue-"],
+  .dark a[class*="bg-blue-"] {
+    color: #ffffff;
+  }
+}
+
+/* Sembunyikan notifikasi error, toast, dialog overlay, dan error portal jika di dalam iframe / preview */
+.is-iframe #next-error-overlay,
+.is-iframe [data-nextjs-dialog-overlay],
+.is-iframe [data-nextjs-toast],
+.is-iframe .nextjs-toast-errors-parent,
+.is-iframe nextjs-portal,
+.is-iframe [role="alert"],
+.is-iframe [data-state="open"].border-destructive\/30 {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+}
