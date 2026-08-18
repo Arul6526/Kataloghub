@@ -147,7 +147,7 @@ export function AiTeamSection() {
                       Business signal
                     </p>
                     <p className="truncate text-xs font-semibold">
-                      "Buatkan campaign promo ATK untuk awal tahun ajaran"
+                      &quot;Buatkan campaign promo ATK untuk awal tahun ajaran&quot;
                     </p>
                   </div>
                   <ArrowRight className="h-4 w-4 shrink-0 text-primary" />

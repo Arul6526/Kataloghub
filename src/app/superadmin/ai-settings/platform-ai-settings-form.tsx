@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, Loader2, Save } from "lucide-react";
+import { Bot, Loader2, PlugZap, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { savePlatformAiSettingsAction } from "@/lib/actions/ai-actions";
+import {
+  savePlatformAiSettingsAction,
+  testPlatformAiConnectionAction,
+} from "@/lib/actions/ai-actions";
 
 type Settings = {
   enabled: boolean;
@@ -21,6 +24,7 @@ type Settings = {
 export function PlatformAiSettingsForm({ settings }: { settings: Settings }) {
   const [form, setForm] = useState({ ...settings, apiKey: "" });
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState("");
   const update = (key: string, value: string | boolean | number) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -36,6 +40,20 @@ export function PlatformAiSettingsForm({ settings }: { settings: Settings }) {
         : result.error || "Gagal menyimpan konfigurasi.",
     );
     if (result.success) update("apiKey", "");
+  }
+
+  async function testConnection() {
+    setTesting(true);
+    setMessage("");
+    const result = await testPlatformAiConnectionAction({
+      baseUrl: form.baseUrl,
+      model: form.model,
+      apiKey: form.apiKey || undefined,
+    });
+    setTesting(false);
+    setMessage(
+      result.success ? result.message || "Koneksi berhasil." : result.error || "Koneksi gagal.",
+    );
   }
 
   return (
@@ -126,10 +144,26 @@ export function PlatformAiSettingsForm({ settings }: { settings: Settings }) {
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-zinc-800 pt-4">
           <span className="text-sm text-zinc-400">{message}</span>
-          <Button disabled={saving} className="gap-2">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{" "}
-            Simpan
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={testing || saving}
+              onClick={() => void testConnection()}
+              className="gap-2"
+            >
+              {testing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <PlugZap className="h-4 w-4" />
+              )}
+              {testing ? "Mengecek..." : "Cek Koneksi"}
+            </Button>
+            <Button type="submit" disabled={saving || testing} className="gap-2">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{" "}
+              Simpan
+            </Button>
+          </div>
         </div>
       </form>
     </div>

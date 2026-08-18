@@ -2,9 +2,14 @@
 
 import { requireAdmin, requireSuperAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
-import { encryptSecret, maskSecret } from "@/lib/ai/secrets";
+import { decryptSecret, encryptSecret } from "@/lib/ai/secrets";
 import { validateAiBaseUrl } from "@/lib/ai/openai-compatible";
-import { getUserAiSettings, saveUserAiSettings } from "@/lib/ai/service";
+import {
+  getEffectiveAiConfig,
+  getUserAiSettings,
+  saveUserAiSettings,
+  testAiConnection,
+} from "@/lib/ai/service";
 import type { AiMode } from "@/lib/ai/types";
 
 export async function getMyAiSettingsAction() {
@@ -27,6 +32,47 @@ export async function saveMyAiSettingsAction(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Gagal menyimpan konfigurasi AI.",
+    };
+  }
+}
+
+export async function testMyAiConnectionAction(input: {
+  mode: AiMode;
+  baseUrl: string;
+  model: string;
+  apiKey?: string;
+}) {
+  const current = await requireAdmin();
+  try {
+    if (input.mode === "managed") {
+      const config = await getEffectiveAiConfig(current.userId);
+      const result = await testAiConnection(config);
+      return {
+        success: true,
+        message: `Koneksi Managed berhasil. Model ${result.model} merespons.`,
+      };
+    }
+
+    if (!input.apiKey?.trim()) {
+      const config = await getEffectiveAiConfig(current.userId);
+      const result = await testAiConnection({
+        baseUrl: input.baseUrl,
+        model: input.model,
+        apiKey: config.apiKey,
+      });
+      return { success: true, message: `Koneksi BYOK berhasil. Model ${result.model} merespons.` };
+    }
+
+    const result = await testAiConnection({
+      baseUrl: input.baseUrl,
+      model: input.model,
+      apiKey: input.apiKey.trim(),
+    });
+    return { success: true, message: `Koneksi BYOK berhasil. Model ${result.model} merespons.` };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Koneksi provider AI gagal.",
     };
   }
 }
@@ -92,6 +138,39 @@ export async function savePlatformAiSettingsAction(input: {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Gagal menyimpan konfigurasi AI platform.",
+    };
+  }
+}
+
+export async function testPlatformAiConnectionAction(input: {
+  baseUrl: string;
+  model: string;
+  apiKey?: string;
+}) {
+  await requireSuperAdmin();
+  try {
+    const db = createAdminClient();
+    const baseUrl = validateAiBaseUrl(input.baseUrl);
+    const { data: existing } = await db
+      .from("ai_platform_settings")
+      .select("encrypted_api_key")
+      .eq("id", true)
+      .maybeSingle();
+    const encryptedKey = input.apiKey?.trim()
+      ? input.apiKey.trim()
+      : existing?.encrypted_api_key
+        ? decryptSecret(existing.encrypted_api_key)
+        : "";
+    if (!encryptedKey) return { success: false, error: "API key platform belum diisi." };
+    const result = await testAiConnection({ baseUrl, model: input.model, apiKey: encryptedKey });
+    return {
+      success: true,
+      message: `Koneksi provider berhasil. Model ${result.model} merespons.`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Koneksi provider AI gagal.",
     };
   }
 }

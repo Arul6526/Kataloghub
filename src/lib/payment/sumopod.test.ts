@@ -4,7 +4,7 @@ import {
   isSumopodPaymentFailed,
   isSumopodPaymentPaid,
   normalizeSumopodStatus,
-  // @ts-ignore Node's native TypeScript runner requires the file extension.
+  // @ts-expect-error Node's native TypeScript runner requires the file extension.
 } from "./sumopod.ts";
 
 test("normalizes gateway statuses consistently", () => {

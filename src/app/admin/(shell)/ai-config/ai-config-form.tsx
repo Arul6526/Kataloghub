@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, CheckCircle2, KeyRound, Loader2, Save } from "lucide-react";
+import { Bot, CheckCircle2, KeyRound, Loader2, PlugZap, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { saveMyAiSettingsAction } from "@/lib/actions/ai-actions";
+import { saveMyAiSettingsAction, testMyAiConnectionAction } from "@/lib/actions/ai-actions";
 import type { AiSettingsView } from "@/lib/ai/types";
 
 export function AiConfigForm({ settings }: { settings: AiSettingsView }) {
@@ -15,6 +15,7 @@ export function AiConfigForm({ settings }: { settings: AiSettingsView }) {
   const [model, setModel] = useState(settings.model);
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState("");
 
   async function handleSubmit(event: React.FormEvent) {
@@ -35,6 +36,21 @@ export function AiConfigForm({ settings }: { settings: AiSettingsView }) {
         : result.error || "Gagal menyimpan konfigurasi.",
     );
     if (result.success) setApiKey("");
+  }
+
+  async function handleTestConnection() {
+    setTesting(true);
+    setMessage("");
+    const result = await testMyAiConnectionAction({
+      mode,
+      baseUrl,
+      model,
+      apiKey: apiKey || undefined,
+    });
+    setTesting(false);
+    setMessage(
+      result.success ? result.message || "Koneksi berhasil." : result.error || "Koneksi gagal.",
+    );
   }
 
   return (
@@ -118,17 +134,33 @@ export function AiConfigForm({ settings }: { settings: AiSettingsView }) {
             />
           </div>
         )}
-        <div className="flex items-center justify-between gap-4 border-t pt-4">
+        <div className="flex flex-col items-stretch justify-between gap-3 border-t pt-4 sm:flex-row sm:items-center">
           {message && (
             <p className="flex items-center gap-1 text-sm text-muted-foreground">
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
               {message}
             </p>
           )}
-          <Button type="submit" disabled={saving} className="ml-auto gap-2">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{" "}
-            Simpan Konfigurasi
-          </Button>
+          <div className="ml-auto flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={testing || saving}
+              onClick={() => void handleTestConnection()}
+              className="gap-2"
+            >
+              {testing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <PlugZap className="h-4 w-4" />
+              )}
+              {testing ? "Mengecek..." : "Cek Koneksi"}
+            </Button>
+            <Button type="submit" disabled={saving || testing} className="gap-2">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{" "}
+              Simpan Konfigurasi
+            </Button>
+          </div>
         </div>
       </form>
     </div>

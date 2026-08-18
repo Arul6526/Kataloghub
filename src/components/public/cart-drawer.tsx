@@ -12,7 +12,7 @@ import {
   MessageCircle,
   Sparkles,
   ArrowRight,
-  CheckCircle2
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatWhatsAppNumber } from "@/lib/whatsapp";
@@ -24,7 +24,12 @@ interface CartDrawerProps {
   whatsappTemplate?: string | null;
 }
 
-export function CartDrawer({ storeSlug, brandName, whatsappNumber, whatsappTemplate }: CartDrawerProps) {
+export function CartDrawer({
+  storeSlug,
+  brandName,
+  whatsappNumber,
+  whatsappTemplate,
+}: CartDrawerProps) {
   const {
     cartItems,
     removeFromCart,
@@ -56,7 +61,7 @@ export function CartDrawer({ storeSlug, brandName, whatsappNumber, whatsappTempl
     const cleanNumber = formatWhatsAppNumber(whatsappNumber || "628123456789");
 
     // Format Multi-Product Message
-    let itemsText = cartItems
+    const itemsText = cartItems
       .map((item, index) => {
         const priceStr = item.price ? formatRupiah(item.price * item.qty) : "Harga hubungi admin";
         return `${index + 1}. *${item.name}* (x${item.qty}) - ${priceStr}`;
@@ -97,17 +102,16 @@ export function CartDrawer({ storeSlug, brandName, whatsappNumber, whatsappTempl
     <>
       {/* Slide-out Cart Drawer Overlay */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="relative flex h-full w-full max-w-md flex-col bg-card border-l border-border shadow-2xl animate-in slide-in-from-right duration-300">
-            
+        <div className="backdrop-blur-xs fixed inset-0 z-50 flex justify-end bg-black/60 duration-200 animate-in fade-in">
+          <div className="relative flex h-full w-full max-w-md flex-col border-l border-border bg-card shadow-2xl duration-300 animate-in slide-in-from-right">
             {/* Drawer Header */}
-            <div className="flex items-center justify-between border-b px-5 py-4 bg-muted/40">
+            <div className="flex items-center justify-between border-b bg-muted/40 px-5 py-4">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 font-bold text-primary">
                   <ShoppingBag className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="font-space font-bold text-foreground text-base leading-tight">
+                  <h3 className="font-space text-base font-bold leading-tight text-foreground">
                     Keranjang Pesanan
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -118,22 +122,23 @@ export function CartDrawer({ storeSlug, brandName, whatsappNumber, whatsappTempl
 
               <button
                 onClick={() => setIsCartOpen(false)}
-                className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Cart Items List */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
               {cartItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-center space-y-3">
-                  <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                <div className="flex h-64 flex-col items-center justify-center space-y-3 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
                     <ShoppingBag className="h-8 w-8" />
                   </div>
-                  <h4 className="font-bold text-foreground text-sm">Keranjang Anda Kosong</h4>
-                  <p className="text-xs text-muted-foreground max-w-xs">
-                    Pilih produk yang ingin Anda beli dari katalog untuk dimasukkan ke keranjang pesanan.
+                  <h4 className="text-sm font-bold text-foreground">Keranjang Anda Kosong</h4>
+                  <p className="max-w-xs text-xs text-muted-foreground">
+                    Pilih produk yang ingin Anda beli dari katalog untuk dimasukkan ke keranjang
+                    pesanan.
                   </p>
                 </div>
               ) : (
@@ -142,29 +147,35 @@ export function CartDrawer({ storeSlug, brandName, whatsappNumber, whatsappTempl
                   return (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-muted/30 p-3 shadow-xs transition-colors hover:border-primary/40"
+                      className="shadow-xs flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-muted/30 p-3 transition-colors hover:border-primary/40"
                     >
-                      <div className="h-14 w-14 rounded-lg bg-muted overflow-hidden shrink-0 border border-border">
+                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                         {imgUrl ? (
-                          <img src={imgUrl} alt={item.name} className="h-full w-full object-cover" />
+                          <img
+                            src={imgUrl}
+                            alt={item.name}
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
-                          <div className="h-full w-full flex items-center justify-center text-[10px] text-muted-foreground font-mono">
+                          <div className="flex h-full w-full items-center justify-center font-mono text-[10px] text-muted-foreground">
                             No Pic
                           </div>
                         )}
                       </div>
 
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-xs text-foreground truncate">{item.name}</h4>
-                        <p className="text-xs font-bold font-mono text-primary mt-0.5">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="truncate text-xs font-semibold text-foreground">
+                          {item.name}
+                        </h4>
+                        <p className="mt-0.5 font-mono text-xs font-bold text-primary">
                           {item.price ? formatRupiah(item.price) : "Hubungi Admin"}
                         </p>
 
-                        <div className="flex items-center gap-2 mt-2">
+                        <div className="mt-2 flex items-center gap-2">
                           <div className="flex items-center rounded-lg border border-border bg-background">
                             <button
                               onClick={() => updateQty(item.id, item.qty - 1)}
-                              className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-l-lg transition-colors"
+                              className="flex h-6 w-6 items-center justify-center rounded-l-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                               <Minus className="h-3 w-3" />
                             </button>
@@ -173,7 +184,7 @@ export function CartDrawer({ storeSlug, brandName, whatsappNumber, whatsappTempl
                             </span>
                             <button
                               onClick={() => updateQty(item.id, item.qty + 1)}
-                              className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-r-lg transition-colors"
+                              className="flex h-6 w-6 items-center justify-center rounded-r-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                               <Plus className="h-3 w-3" />
                             </button>
@@ -183,7 +194,7 @@ export function CartDrawer({ storeSlug, brandName, whatsappNumber, whatsappTempl
 
                       <button
                         onClick={() => removeFromCart(item.id)}
-                        className="text-muted-foreground hover:text-destructive p-1 rounded-md transition-colors"
+                        className="rounded-md p-1 text-muted-foreground transition-colors hover:text-destructive"
                         title="Hapus"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -196,9 +207,9 @@ export function CartDrawer({ storeSlug, brandName, whatsappNumber, whatsappTempl
 
             {/* Drawer Footer & Checkout */}
             {cartItems.length > 0 && (
-              <div className="border-t bg-muted/20 p-5 space-y-4">
+              <div className="space-y-4 border-t bg-muted/20 p-5">
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-foreground block">
+                  <label className="block text-xs font-medium text-foreground">
                     Nama Pemesan <span className="text-muted-foreground">(Opsional)</span>
                   </label>
                   <input
@@ -206,13 +217,15 @@ export function CartDrawer({ storeSlug, brandName, whatsappNumber, whatsappTempl
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="Masukkan nama Anda..."
-                    className="w-full h-9 px-3 text-xs border border-border rounded-lg bg-background focus:outline-none focus:border-primary transition-colors"
+                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs transition-colors focus:border-primary focus:outline-none"
                   />
                 </div>
 
-                <div className="flex justify-between items-baseline border-t border-border/60 pt-3">
-                  <span className="text-xs font-medium text-muted-foreground">Total Estimasi ({totalItems} Item):</span>
-                  <span className="font-space font-extrabold text-lg text-foreground font-mono">
+                <div className="flex items-baseline justify-between border-t border-border/60 pt-3">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Total Estimasi ({totalItems} Item):
+                  </span>
+                  <span className="font-mono font-space text-lg font-extrabold text-foreground">
                     {totalPrice > 0 ? formatRupiah(totalPrice) : "Sesuai konfirmasi"}
                   </span>
                 </div>
@@ -222,7 +235,7 @@ export function CartDrawer({ storeSlug, brandName, whatsappNumber, whatsappTempl
                     size="lg"
                     onClick={handleCheckoutWA}
                     disabled={loadingCheckout}
-                    className="w-full font-bold bg-emerald-600 hover:bg-emerald-500 text-white gap-2 shadow-md"
+                    className="w-full gap-2 bg-emerald-600 font-bold text-white shadow-md hover:bg-emerald-500"
                   >
                     <MessageCircle className="h-5 w-5" />
                     Kirim Pesanan via WhatsApp
@@ -230,7 +243,7 @@ export function CartDrawer({ storeSlug, brandName, whatsappNumber, whatsappTempl
 
                   <button
                     onClick={clearCart}
-                    className="w-full text-[11px] text-muted-foreground hover:text-destructive transition-colors text-center py-1"
+                    className="w-full py-1 text-center text-[11px] text-muted-foreground transition-colors hover:text-destructive"
                   >
                     Bersihkan Keranjang
                   </button>

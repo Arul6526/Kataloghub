@@ -224,6 +224,15 @@ export async function completeForUser(
   return { ...result, mode: config.mode, providerName: config.providerName, model: config.model };
 }
 
+export async function testAiConnection(config: { baseUrl: string; apiKey: string; model: string }) {
+  const result = await createOpenAiCompatibleCompletion({
+    ...config,
+    messages: [{ role: "user", content: "Reply with OK only." }],
+    maxTokens: 2,
+  });
+  return { model: config.model, totalTokens: result.totalTokens };
+}
+
 export function serializeSecretStatus(value: string | null | undefined) {
   return maskSecret(value);
 }

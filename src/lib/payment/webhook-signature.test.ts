@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import test from "node:test";
-// @ts-ignore Node's native TypeScript runner requires the file extension.
+// @ts-expect-error Node's native TypeScript runner requires the file extension.
 import { verifyWebhookSignature } from "./webhook-signature.ts";
 
 const secret = `whsec_${Buffer.from("sandbox-secret").toString("base64")}`;
