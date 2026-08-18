@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Space_Grotesk } from "next/font/google";
 import { Database, CheckCircle2, Sparkles } from "lucide-react";
 import { RegisterForm } from "./register-form";
+import { getSubscriptionPlans } from "@/lib/actions/saas-actions";
 import { AuthBrandingShowcase } from "@/components/auth/auth-branding-showcase";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -17,7 +18,9 @@ export const metadata: Metadata = {
   description: "Buat website katalog untuk bisnis Anda sekarang.",
 };
 
-export default function RegisterPage() {
+export default async function RegisterPage() {
+  const plans = await getSubscriptionPlans();
+
   return (
     <div
       className={`flex min-h-screen flex-col bg-background text-foreground lg:h-screen lg:overflow-hidden ${spaceGrotesk.variable}`}
@@ -76,7 +79,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <RegisterForm />
+            <RegisterForm plans={plans} />
 
             <div className="border-t border-border/50 pt-4 text-center text-xs text-muted-foreground">
               Dengan mendaftar, Anda siap membawa toko ke layar pelanggan. Sudah punya akun?{" "}

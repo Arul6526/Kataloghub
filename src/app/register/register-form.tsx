@@ -5,15 +5,20 @@ import { useSearchParams } from "next/navigation";
 import { ArrowRight, Chrome, Eye, EyeOff, Loader2, CreditCard, Sparkles } from "lucide-react";
 import { registerAction } from "@/lib/actions/auth-actions";
 import { createClient } from "@/lib/supabase/client";
+import type { SubscriptionPlanConfig } from "@/lib/db/types";
 
-export function RegisterForm() {
+export function RegisterForm({ plans }: { plans: SubscriptionPlanConfig[] }) {
   const searchParams = useSearchParams();
-  const initialPlan = searchParams.get("plan") || "free_trial";
+  const requestedPlan = searchParams.get("plan");
+  const initialPlan = plans.some((plan) => plan.slug === requestedPlan)
+    ? requestedPlan!
+    : plans.find((plan) => plan.slug === "free_trial")?.slug || plans[0]?.slug || "";
 
   const [selectedPlan, setSelectedPlan] = useState<string>(initialPlan);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const selectedPlanData = plans.find((plan) => plan.slug === selectedPlan);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -83,59 +88,46 @@ export function RegisterForm() {
           <label className="text-sm font-medium text-foreground">Pilih cara mulai</label>
           <span className="text-[10px] text-muted-foreground">Bisa upgrade kapan saja</span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={() => setSelectedPlan("free_trial")}
-            className={`flex flex-col justify-between rounded-lg border p-2.5 text-left transition-all ${
-              selectedPlan === "free_trial"
-                ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                : "border-border/80 bg-background hover:bg-muted/40 dark:border-border"
-            }`}
-          >
-            <span className="text-xs font-bold text-foreground">Free Trial</span>
-            <span className="mt-1 text-[10px] text-muted-foreground">Uji coba 90 hari</span>
-            <span className="mt-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-              5 Produk
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedPlan("starter")}
-            className={`relative flex flex-col justify-between rounded-lg border p-2.5 text-left transition-all ${
-              selectedPlan === "starter"
-                ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                : "border-border/80 bg-background hover:bg-muted/40 dark:border-border"
-            }`}
-          >
-            <span className="flex items-center gap-1 text-xs font-bold text-foreground">
-              Starter
-            </span>
-            <span className="mt-1 text-[10px] font-semibold text-primary">Rp20.000</span>
-            <span className="text-[10px] text-muted-foreground">20 Produk</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedPlan("pro")}
-            className={`relative flex flex-col justify-between rounded-lg border p-2.5 text-left transition-all ${
-              selectedPlan === "pro"
-                ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                : "border-border/80 bg-background hover:bg-muted/40 dark:border-border"
-            }`}
-          >
-            <span className="flex items-center gap-1 text-xs font-bold text-foreground">
-              Pro <Sparkles className="h-3 w-3 fill-amber-500 text-amber-500" />
-            </span>
-            <span className="mt-1 text-[10px] font-semibold text-primary">Rp75.000</span>
-            <span className="text-[10px] text-muted-foreground">100 Produk</span>
-          </button>
-        </div>
-        {selectedPlan !== "free_trial" && (
+        {plans.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2">
+            {plans.map((plan) => (
+              <button
+                key={plan.slug}
+                type="button"
+                onClick={() => setSelectedPlan(plan.slug)}
+                className={`relative flex min-h-24 flex-col justify-between rounded-lg border p-2.5 text-left transition-all ${
+                  selectedPlan === plan.slug
+                    ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                    : "border-border/80 bg-background hover:bg-muted/40 dark:border-border"
+                }`}
+              >
+                {plan.is_popular && (
+                  <span className="absolute -right-1.5 -top-2 rounded-full bg-primary px-1.5 py-0.5 text-[8px] font-bold text-primary-foreground">
+                    POPULER
+                  </span>
+                )}
+                <span className="flex items-center gap-1 text-xs font-bold text-foreground">
+                  {plan.name}
+                  {plan.is_popular && <Sparkles className="h-3 w-3 fill-amber-500 text-amber-500" />}
+                </span>
+                <span className={`mt-1 text-[10px] font-semibold ${plan.price > 0 ? "text-primary" : "text-emerald-600 dark:text-emerald-400"}`}>
+                  {plan.price_label || (plan.price > 0 ? `Rp${plan.price.toLocaleString("id-ID")}` : "Gratis")}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  {plan.max_products} Produk · {plan.billing_period}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+            Paket belum tersedia. Silakan coba lagi nanti.
+          </p>
+        )}
+        {selectedPlanData && selectedPlanData.price > 0 && (
           <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
             <CreditCard className="h-3 w-3 shrink-0" />
-            Setelah akun dibuat, Anda akan diarahkan ke pembayaran QRIS yang aman.
+            Setelah akun terverifikasi, Anda akan diarahkan ke pembayaran QRIS yang aman.
           </p>
         )}
       </div>
@@ -190,10 +182,10 @@ export function RegisterForm() {
       >
         {loading ? (
           <Loader2 className="h-4 w-4 animate-spin" />
-        ) : selectedPlan === "free_trial" ? (
-          "Buat Akun Gratis Sekarang"
+        ) : selectedPlanData && selectedPlanData.price > 0 ? (
+          `Lanjut Pembayaran ${selectedPlanData.name} via QRIS`
         ) : (
-          `Lanjut Pembayaran ${selectedPlan.toUpperCase()} via QRIS`
+          "Buat Akun Gratis Sekarang"
         )}
         {!loading && <ArrowRight className="h-4 w-4" />}
       </button>

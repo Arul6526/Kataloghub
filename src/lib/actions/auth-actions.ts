@@ -28,6 +28,18 @@ export async function registerAction(formData: FormData) {
     return { error: error.message };
   }
 
+  // Ambil konfigurasi paket dari database
+  const { data: planConfig } = await supabase
+    .from("subscription_plans")
+    .select("slug, price, is_active")
+    .eq("slug", selectedPlan)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!planConfig) {
+    return { error: "Paket yang dipilih tidak tersedia." };
+  }
+
   let checkoutUrl: string | null = null;
   let orderId: string | null = null;
 
@@ -77,9 +89,9 @@ export async function registerAction(formData: FormData) {
         };
       }
 
-      // 4. Jika pengguna memilih paket berbayar saat pendaftaran (misal: Starter / Pro)
-      if (selectedPlan === "starter" || selectedPlan === "pro") {
-        const amount = selectedPlan === "starter" ? 20000 : 75000;
+      // 4. Jika pengguna memilih paket berbayar saat pendaftaran
+      if (Number(planConfig.price) > 0) {
+        const amount = Number(planConfig.price);
         const timestamp = Date.now().toString(36).toUpperCase();
         const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
         orderId = `KH-REG-${selectedPlan.toUpperCase()}-${timestamp}-${rand}`;

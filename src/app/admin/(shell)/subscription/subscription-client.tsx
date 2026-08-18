@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   Subscription,
   SubscriptionPlanConfig,
@@ -73,6 +73,7 @@ export function SubscriptionClientView({
   const [selectedPlanSlug, setSelectedPlanSlug] = useState<string>("pro");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"success" | "error" | "info">("success");
 
   const [sumopodLoading, setSumopodLoading] = useState<string | null>(null);
   const [syncingOrderId, setSyncingOrderId] = useState<string | null>(null);
@@ -84,6 +85,54 @@ export function SubscriptionClientView({
     planSlug?: string;
   } | null>(queryOrderId ? { orderId: queryOrderId } : null);
   const [simulatingOrderId, setSimulatingOrderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!queryOrderId) return;
+
+    if (paymentQueryStatus === "cancel" || paymentQueryStatus === "failed") {
+      setActivePaymentOrder(null);
+      setMessageTone("error");
+      setMessage("Pembayaran dibatalkan atau gagal. Tidak ada paket yang diaktifkan.");
+      return;
+    }
+
+    if (paymentQueryStatus !== "success") return;
+
+    let cancelled = false;
+    setMessageTone("info");
+    setMessage("Pembayaran diterima. Sedang memverifikasi status dan mengaktifkan subscription...");
+
+    void checkAndSyncSumopodPaymentStatusAction(queryOrderId)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success && res.isPaid) {
+          setMessageTone("success");
+          setMessage("Pembayaran berhasil. Subscription Anda sudah aktif.");
+          setActivePaymentOrder(null);
+          router.refresh();
+        } else if (res.success) {
+          setMessageTone("info");
+          setMessage(
+            "Pembayaran sudah kembali dari Sumopod, tetapi webhook/status final masih diproses. Klik Cek Status Live API jika perlu.",
+          );
+        } else {
+          setMessageTone("error");
+          setMessage(
+            `Verifikasi pembayaran gagal: ${res.error || "status belum dapat dikonfirmasi."}`,
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMessageTone("error");
+          setMessage("Verifikasi pembayaran gagal terhubung ke gateway. Coba Cek Status Live API.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [paymentQueryStatus, queryOrderId, router]);
 
   const plan = subscription?.plan_name || "free_trial";
   const status = subscription?.status || "active";
@@ -279,7 +328,9 @@ export function SubscriptionClientView({
       )}
 
       {message && (
-        <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+        <div
+          className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${messageTone === "error" ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300" : messageTone === "info" ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"}`}
+        >
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           {message}
         </div>
