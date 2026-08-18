@@ -44,3 +44,6 @@ Kataloghub-go-live/archived-deadcode/
 .agents/
 __pycache__/
 *.pyc
+
+.vercel
+.env*
