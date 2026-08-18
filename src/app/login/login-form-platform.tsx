@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
+import { ArrowRight, Chrome, Eye, EyeOff, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export function LoginFormPlatform() {
   const [loading, setLoading] = useState(false);
@@ -34,47 +35,73 @@ export function LoginFormPlatform() {
     }
   }
 
+  async function handleGoogleLogin() {
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=/admin` },
+    });
+    if (oauthError) {
+      setError(oauthError.message);
+      setLoading(false);
+    }
+  }
+
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
       {error && (
-        <div className="bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-md px-4 py-3 text-sm flex items-center gap-2">
+        <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-950/50 dark:text-red-400">
           {error}
         </div>
       )}
+      <button
+        type="button"
+        onClick={() => void handleGoogleLogin()}
+        disabled={loading}
+        className="flex h-12 w-full items-center justify-center gap-2 rounded-md border-2 border-border/80 bg-background text-sm font-semibold transition-colors hover:bg-muted disabled:opacity-50"
+      >
+        <Chrome className="h-4 w-4" /> Masuk dengan Google
+      </button>
+      <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span className="h-px flex-1 bg-border" /> atau dengan email{" "}
+        <span className="h-px flex-1 bg-border" />
+      </div>
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Email Pribadi</label>
-        <input 
-          type="email" 
+        <input
+          type="email"
           name="email"
           required
           placeholder="anda@email.com"
-          className="w-full h-12 px-4 border-2 border-border/80 dark:border-border rounded-md bg-background focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-sm transition-colors"
+          className="h-12 w-full rounded-md border-2 border-border/80 bg-background px-4 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-border"
         />
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Kata Sandi</label>
         <div className="relative">
-          <input 
-            type={showPassword ? "text" : "password"} 
+          <input
+            type={showPassword ? "text" : "password"}
             name="password"
             required
             placeholder="••••••••"
-            className="w-full h-12 pl-4 pr-11 border-2 border-border/80 dark:border-border rounded-md bg-background focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-sm transition-colors"
+            className="h-12 w-full rounded-md border-2 border-border/80 bg-background pl-4 pr-11 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-border"
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center focus:outline-none"
+            className="absolute right-0 top-0 flex h-full items-center justify-center px-3 text-muted-foreground transition-colors hover:text-foreground focus:outline-none"
             aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
           >
             {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
           </button>
         </div>
       </div>
-      <button 
+      <button
         type="submit"
         disabled={loading}
-        className="w-full h-12 bg-primary text-primary-foreground rounded-md text-sm font-semibold mt-4 flex items-center justify-center gap-2 transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+        className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
       >
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Masuk Sekarang"}
         {!loading && <ArrowRight className="h-4 w-4" />}

@@ -15,6 +15,13 @@ export async function registerAction(formData: FormData) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      data: {
+        business_name: businessName,
+        selected_plan: selectedPlan,
+      },
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/callback?next=/admin`,
+    },
   });
 
   if (error) {
@@ -27,7 +34,7 @@ export async function registerAction(formData: FormData) {
   if (data.user) {
     try {
       const adminDb = createAdminClient();
-      
+
       // 2. Pastikan Profile terbuat (Self-healing bila DB trigger tidak aktif)
       await adminDb.from("profiles").upsert(
         {
@@ -36,15 +43,16 @@ export async function registerAction(formData: FormData) {
           full_name: businessName || email.split("@")[0],
           is_admin: true,
         },
-        { onConflict: "id" }
+        { onConflict: "id" },
       );
 
       // 3. Pastikan Site Settings terbuat untuk toko baru
-      const baseSlug = (businessName || email.split("@")[0] || "toko")
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "") || "toko";
+      const baseSlug =
+        (businessName || email.split("@")[0] || "toko")
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "-")
+          .replace(/-+/g, "-")
+          .replace(/^-|-$/g, "") || "toko";
       const storeSlug = `${baseSlug}-${data.user.id.substring(0, 6)}`;
 
       await adminDb.from("site_settings").upsert(
@@ -56,8 +64,18 @@ export async function registerAction(formData: FormData) {
           seo_description: `Katalog produk resmi ${businessName || "Toko"}`,
           whatsapp_template: "Halo, saya tertarik dengan produk di katalog Anda.",
         },
-        { onConflict: "user_id" }
+        { onConflict: "user_id" },
       );
+
+      // Dengan email confirmation aktif, user belum memiliki session.
+      // Jangan membuat pembayaran atau mengarahkan ke admin sebelum email terverifikasi.
+      if (!data.session) {
+        return {
+          success: true,
+          requiresEmailVerification: true,
+          email,
+        };
+      }
 
       // 4. Jika pengguna memilih paket berbayar saat pendaftaran (misal: Starter / Pro)
       if (selectedPlan === "starter" || selectedPlan === "pro") {
@@ -69,6 +87,7 @@ export async function registerAction(formData: FormData) {
         const appUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
         const successReturnUrl = `${appUrl}/admin/subscription?payment=success&order_id=${orderId}`;
         const cancelReturnUrl = `${appUrl}/admin/subscription?payment=cancel&order_id=${orderId}`;
+        const webhookUrl = `${appUrl}/api/payments/sumopod/webhook`;
 
         const sumopodRes = await createSumopodPayment({
           orderId,
@@ -77,11 +96,15 @@ export async function registerAction(formData: FormData) {
           expiresInHours: 24,
           successReturnUrl,
           cancelReturnUrl,
+          webhookUrl,
           paymentMethodTypeCode: "QRIS",
         });
 
-        checkoutUrl = sumopodRes.data?.payment_link_url || sumopodRes.data?.payment_url || sumopodRes.data?.checkout_url || null;
-
+        checkoutUrl =
+          sumopodRes.data?.payment_link_url ||
+          sumopodRes.data?.payment_url ||
+          sumopodRes.data?.checkout_url ||
+          null;
 
         await adminDb.from("subscription_payments").insert({
           user_id: data.user.id,
@@ -101,11 +124,26 @@ export async function registerAction(formData: FormData) {
     }
   }
 
-  return { 
-    success: true, 
+  return {
+    success: true,
     selectedPlan,
     checkoutUrl,
     orderId,
   };
 }
 
+export async function resendVerificationEmailAction(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) return { success: false, error: "Email wajib diisi." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: normalizedEmail,
+    options: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/callback?next=/admin`,
+    },
+  });
+
+  return error ? { success: false, error: error.message } : { success: true };
+}

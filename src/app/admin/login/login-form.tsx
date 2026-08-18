@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { Eye, EyeOff, Loader2, LogIn } from "lucide-react";
+import { Chrome, Eye, EyeOff, Loader2, LogIn } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const router = useRouter();
@@ -27,7 +28,11 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login gagal");
-      toast({ variant: "success", title: "Berhasil masuk", description: "Mengarahkan ke dashboard" });
+      toast({
+        variant: "success",
+        title: "Berhasil masuk",
+        description: "Mengarahkan ke dashboard",
+      });
       window.location.href = data.redirectTo || redirectTo;
     } catch (err) {
       toast({
@@ -40,8 +45,36 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
     }
   }
 
+  async function handleGoogleLogin() {
+    setLoading(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
+      },
+    });
+    if (error) {
+      toast({ variant: "error", title: "Login Google gagal", description: error.message });
+      setLoading(false);
+    }
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full gap-2"
+        disabled={loading}
+        onClick={() => void handleGoogleLogin()}
+      >
+        <Chrome className="h-4 w-4" /> Masuk dengan Google
+      </Button>
+      <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span className="h-px flex-1 bg-border" /> atau dengan email{" "}
+        <span className="h-px flex-1 bg-border" />
+      </div>
       <Field label="Email" htmlFor="email" required>
         <Input
           id="email"
@@ -70,14 +103,10 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             disabled={loading}
-            className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-r-md"
+            className="absolute right-0 top-0 flex h-full items-center justify-center rounded-r-md px-3 text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
           >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
       </Field>

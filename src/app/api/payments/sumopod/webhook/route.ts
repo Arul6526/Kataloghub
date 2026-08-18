@@ -91,6 +91,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const webhookAmount = dataObj.amount ?? dataObj.total_amount ?? dataObj.gross_amount;
+    if (webhookAmount !== undefined && Number(webhookAmount) !== Number(payment.amount)) {
+      console.warn(`Nominal webhook ${webhookAmount} tidak cocok dengan order ${orderId}.`);
+      return NextResponse.json(
+        { success: false, message: "Payment amount mismatch" },
+        { status: 400 },
+      );
+    }
+
+    const webhookCurrency = dataObj.currency;
+    if (webhookCurrency && webhookCurrency.toString().toUpperCase() !== "IDR") {
+      return NextResponse.json(
+        { success: false, message: "Unsupported payment currency" },
+        { status: 400 },
+      );
+    }
+
     // 2. Evaluasi status pembayaran
     const isPaid =
       eventType === "payment.completed" ||
@@ -166,6 +183,12 @@ export async function POST(req: NextRequest) {
         message: "Payment completed and subscription activated",
       });
     } else if (isFailed) {
+      if (payment.status === "completed") {
+        return NextResponse.json({
+          success: true,
+          message: "Payment already completed; ignoring later failure event",
+        });
+      }
       const finalStatus =
         eventType === "payment.expired" || statusRaw === "expired" ? "expired" : "failed";
       const { error: paymentUpdateError } = await adminDb

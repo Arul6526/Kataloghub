@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, Loader2, CreditCard, Sparkles, CheckCircle2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { ArrowRight, Chrome, Eye, EyeOff, Loader2, CreditCard, Sparkles } from "lucide-react";
 import { registerAction } from "@/lib/actions/auth-actions";
+import { createClient } from "@/lib/supabase/client";
 
 export function RegisterForm() {
   const searchParams = useSearchParams();
@@ -27,13 +28,31 @@ export function RegisterForm() {
       setError(res.error);
       setLoading(false);
     } else {
-      if (res.checkoutUrl) {
+      if ("requiresEmailVerification" in res && res.requiresEmailVerification) {
+        window.location.href = `/register/verify-email?email=${encodeURIComponent(res.email || "")}`;
+      } else if (res.checkoutUrl) {
         window.location.href = res.checkoutUrl;
       } else if (res.orderId) {
         window.location.href = `/admin/subscription?payment=pending&order_id=${res.orderId}`;
       } else {
         window.location.href = "/admin";
       }
+    }
+  }
+
+  async function handleGoogleSignup() {
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=/admin`,
+      },
+    });
+    if (oauthError) {
+      setError(oauthError.message);
+      setLoading(false);
     }
   }
 
@@ -44,6 +63,19 @@ export function RegisterForm() {
           {error}
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={() => void handleGoogleSignup()}
+        disabled={loading}
+        className="flex h-12 w-full items-center justify-center gap-2 rounded-md border-2 border-border/80 bg-background text-sm font-semibold transition-colors hover:bg-muted disabled:opacity-50"
+      >
+        <Chrome className="h-4 w-4" /> Daftar dengan Google
+      </button>
+      <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span className="h-px flex-1 bg-border" /> atau dengan email{" "}
+        <span className="h-px flex-1 bg-border" />
+      </div>
 
       {/* Plan Selector */}
       <div className="space-y-2">
