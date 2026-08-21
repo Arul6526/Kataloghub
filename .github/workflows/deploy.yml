@@ -36,17 +36,24 @@ jobs:
       - name: Build (standalone)
         run: npm run build
 
-      - name: Prepare standalone files for deploy branch
+      - name: Prepare files for deploy branch
         run: |
           rm -rf deploy
           mkdir -p deploy
-          # Salin hasil standalone (.next/standalone) ke root folder deploy
-          cp -r .next/standalone/. deploy/
-          # server.js butuh .next/static dan public di lokasi yang sama
-          mkdir -p deploy/.next
-          cp -r .next/static deploy/.next/static
+
+          # 1) Seluruh hasil build .next (tanpa cache agar tidak terlalu besar)
+          cp -r .next deploy/.next
+          rm -rf deploy/.next/cache
+
+          # 2) Folder public (aset statis)
           cp -r public deploy/public
-          # package.json root sebagai referensi versi (opsional)
+
+          # 3) Runtime standalone mandiri: server.js + node_modules minimal
+          #    (Node.js di cPanel cukup jalankan `node server.js`)
+          cp .next/standalone/server.js deploy/server.js
+          cp -r .next/standalone/node_modules deploy/node_modules
+
+          # 4) package.json root sebagai referensi versi
           cp package.json deploy/package.json
 
       - name: Push to branch deploy
