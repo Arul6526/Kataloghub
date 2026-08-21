@@ -1,0 +1,60 @@
+name: Build & Deploy (standalone → branch deploy)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Izinkan push kembali ke repo (branch deploy)
+permissions:
+  contents: write
+
+env:
+  # ── Variabel publik yang di-inline saat `next build` ──
+  # Isi di: GitHub repo → Settings → Secrets and variables → Actions → Variables
+  NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+  NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+  NEXT_PUBLIC_ADMIN_WA: ${{ vars.NEXT_PUBLIC_ADMIN_WA }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (standalone)
+        run: npm run build
+
+      - name: Prepare standalone files for deploy branch
+        run: |
+          rm -rf deploy
+          mkdir -p deploy
+          # Salin hasil standalone (.next/standalone) ke root folder deploy
+          cp -r .next/standalone/. deploy/
+          # server.js butuh .next/static dan public di lokasi yang sama
+          mkdir -p deploy/.next
+          cp -r .next/static deploy/.next/static
+          cp -r public deploy/public
+          # package.json root sebagai referensi versi (opsional)
+          cp package.json deploy/package.json
+
+      - name: Push to branch deploy
+        run: |
+          cd deploy
+          git init -b deploy
+          git config user.email "github-actions@github.com"
+          git config user.name "github-actions"
+          git add -A
+          git commit -m "Deploy build $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" deploy

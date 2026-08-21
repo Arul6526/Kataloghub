@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Bangun sekali sebagai standalone (server mandiri) agar bisa dijalankan di
+  // shared hosting cPanel tanpa perlu `next build` di server.
+  output: "standalone",
+
   experimental: {
     serverActions: {
       bodySizeLimit: "6mb",
